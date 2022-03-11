@@ -1,0 +1,15 @@
+config.txt
+build/
+build
+∗.exe
+bin/∗.exe
+temp∗
+∗∗/configs
+∗∗/configs/local.py
+output/∗∗/result.exe
+
+.DS_Store
+
+/lectures
+.Rproj.user
+meta_analysis.Rproj

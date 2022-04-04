@@ -1,3 +1,10 @@
+---
+title: "exercise1"
+author: "Giulia Bertoldo"
+date: "4/4/2022"
+output: pdf_document
+---
+```{r}
 # Load packages
 library(metafor)
 
@@ -12,6 +19,10 @@ c_total <- c(100, 100, 100, 1000, 250)
 df1 <- data.frame(study, t_died, t_total, c_died, c_total)
 df1
 
+```
+
+\newpage
+```{r}
 # (1a) Inverse-variance weighted meta-analysis on the log odds ratio (FEM)
 ## Calculate log-odds ratio and sampling variance
 df2 <- escalc(ai=t_died, ci=c_died, n1i=t_total, n2i=c_total,
@@ -36,6 +47,11 @@ summary(FEM)
 ## However, Q-statistics and stat. power:
 ## we cannot conclude that there is actually homogeneity.
 
+```
+
+\newpage
+
+```{r}
 # (1d) Remove Manning study
 
 df3 <-df2[-4,]
@@ -50,9 +66,14 @@ summary(FEM)
 ## Indeed standard error is larger and the effect is not significant
 ## at 5% alpha level
 
-# Prof. way to remove study and compare
+# Prof. way to remove study and compare 
 leave1out(FEM)
 
+```
+
+\newpage
+
+```{r}
 
 # MY PROGRAMMING EXERCISES
 # (2a) Inverse-variance weighted meta-analysis on the log odds ratio (FEM)
@@ -71,4 +92,4 @@ df1$log_or <- df1_log_or
 df1
 
 
-
+```

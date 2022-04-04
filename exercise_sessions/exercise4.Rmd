@@ -1,0 +1,82 @@
+---
+title: "Exercise 4"
+author: "Giulia Bertoldo"
+date: "4/4/2022"
+output: pdf_document
+---
+
+# Dataset description
+
+Aguayo, Vargas, de la Fuente, and Lozano (2011) conducted a meta-analysis integrating several reliability estimates from different applications of the Maslach Burnout Inventory (MBI). Data can be found in the file ‘Exercise4.csv’, which includes the sample sizes (ni), reliability coefficients (yi), and means and standard deviations of the total scores at each administration of the test (Mean and SD).
+
+Note: The reliability coefficient is a measure of the accuracy of an instrument obtained by measuring the same individuals twice and computing the correlation of the two sets of measures.
+
+
+
+```{r}
+# Load packages
+library(readxl)
+library(metafor)
+
+# Import data
+df1 <- read_excel('data/Exercise4.xlsx')
+str(df1)
+
+# Rename yi column as yi_original
+names(df1)[names(df1)=="yi"] <- "yi_original"
+str(df1)
+```
+
+\newpage
+
+# Question a
+
+The sampling distribution for reliability coefficients is typically skewed. To solve this problem, compute the Z transformation on the reliability coefficients of this data set.
+
+```{r}
+df1 <- escalc(ri = yi_original, ni = ni, measure = 'ZCOR',  data = df1, append = TRUE)
+str(df1)
+```
+
+
+
+
+
+\newpage
+
+# Question b
+
+Explore, by means of Q-Q plots, how the distribution of the reliability coefficients has changed after applying the Z transformation.
+
+```{r}
+qqnorm(df1$yi_original)
+qqnorm(df1$yi)
+```
+
+The distribution of the transformed coefficients departs less from normality than the distribution of the original correlation coefficients.
+
+\newpage
+
+# Question c
+
+Is there a moderating effect of the mean of the total scores on the transformed coefficients? Use a mixed-effects model (choosing the REML estimation method).
+
+```{r}
+MREM1 <- rma(yi=yi, vi=vi, mods = Mean, data = df1)
+summary(MREM1)
+```
+
+The mean total score does not show a statistically significant relationship with the transformed reliability score ($p =$ `r MREM1$pval[2]`). 
+
+\newpage
+
+# Question d 
+
+Is there a moderating effect of the standard deviation of the total scores on the transformed coefficients? Again, use a mixed-effects model.
+
+```{r}
+MREM2 <- rma(yi=yi, vi=vi, mods = SD, data = df1)
+summary(MREM2)
+```
+
+Yes, the standard deviation shows a statistically significant relationship with the transformed coefficient ($p =$ `r MREM2$pval[2]`) 

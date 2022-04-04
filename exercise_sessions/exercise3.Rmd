@@ -1,0 +1,89 @@
+---
+title: "Exercise 3"
+author: "Giulia Bertoldo"
+date: "4/4/2022"
+output: pdf_document
+---
+
+# Dataset description
+
+Look at the data collected by Sánchez-Meca, Rosa-Alcázar, Marín-Martínez, and Gómez-Conesa (2010), investigating the psychological treatment of panic disorders. Variables DG1-DG7 refer to the standardized mean differences found for different kinds of outcome variables: panic attacks, agoraphobic avoidance, general anxiety, depression, bodily sensation, global adjustment, and other. The variables vdg1-vdg7 refer to the corresponding sampling variances.
+
+```{r}
+# Load packages
+library(readxl)
+library(metafor)
+
+# Import data
+df1 <- read_excel('data/Exercise3.xlsx')
+head(df1)
+```
+
+\newpage
+
+# Question a
+
+Perform a fixed effects and a random effects analysis for the first outcome variable (panic attacks) as well as for the fourth outcome variable (depression). For which outcome variable the effect of the model on the standard error of the mean effect is largest? Can you explain why?
+
+```{r}
+## Panic attacks FEM
+FEM1 <- rma(yi=DG1, vi=vdg1, data=df1, method='FE')
+summary(FEM1)
+## Panic attacks FEM
+REM1 <- rma(yi=DG1, vi=vdg1, data=df1, method='REML')
+summary(REM1)
+
+## Depression FEM
+FEM4 <- rma(yi=DG4, vi=vdg4, data=df1, method='FE')
+summary(FEM4)
+## Depression REM
+REM4 <- rma(yi=DG4, vi=vdg4, data=df1, method='REML')
+summary(REM4)
+
+# Comparison of standard errors
+model <- c('FEM1', 'REM1', 'FEM4', 'REM4')
+se <- c(FEM1$se, REM1$se, FEM4$se, REM4$se)
+
+df2 <- data.frame(model, se)
+df2
+
+# Comparison of tau^2
+model <- c( 'REM1', 'REM4')
+tau2 <- c(REM1$tau2, REM4$tau2)
+(df3 <- data.frame(model, tau2))
+```
+The standard error always increases when moving from a FEM to a REM. This is because in FEM the variance of the mean effect size is just the sampling varinace. Instead in a REM, the variance takes into account the additional uncertainty given by the between-studies heterogeneity. 
+
+The standard errors increase more for panic attacks than for depression because the between studies variance ($\tau^2$) is larger for panic attacks than depression.
+
+
+
+
+
+
+
+\newpage
+
+# Question b
+
+Make a funnel plot for both outcome variables, and use the trim and fill method. Is there evidence for publication bias? Does the correction for publication bias alter the conclusions?
+
+```{r}
+# Funnel plots 
+funnel(FEM1)
+funnel(FEM4)
+```
+The funnel plot for panic attacks is asymmetric with 4 studies on the bottom-right reporting particularly large effect-sizes and large standard errors. However, a number of other studies with smaller standard errors also fall outside the funnel. 
+
+The funnel plot for depression is more symmetric. One study stands out to be outside the funnel, reporting a negative effect size and a standard error around 0.25. In this case it is harder to conclude asymmetry by eye. 
+
+```{r}
+# Trim and fill 
+trimfill(FEM1)
+trimfill(FEM4)
+```
+
+The trim and fill method for the panic attack studies estimate that there are 12 studies missing on the left side. The corrected effect size estimate is 0.7553 and statistically significant. The uncorrected estimate was about 1. So it has considerably decreased in size. 
+
+The trim and fill method for the depression studies estimate that there are 7 studies missing on the left side. The corrected effect size estimate is 0.5314 and statistically significant. The uncorrected estimate was about 0.6. So it has decreased in size, although not as much as for the panic attacks estimate. 
+

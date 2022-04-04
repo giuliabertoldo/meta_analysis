@@ -1,0 +1,85 @@
+---
+title: "Exercise 2"
+author: "Giulia Bertoldo"
+date: "4/4/2022"
+output: pdf_document
+---
+
+# Dataset description
+
+Eagli and Carli (1981) reported a synthesis of ten studies of gender differences in conformity. The effect sizes given in the table below are standardized mean differences, which were separated into three groups on the basis of the percentage of the authors of the research report who were male. A positive g refers to a larger conformity in male study participants, compared to the female study participants. Group 1 consisted of two studies in which 25 percent of the authors were male, group 2 consisted of a single study in which 50 percent of the authors were male, and group 3 consisted of seven studies in which all authors were male.
+
+
+```{r}
+# Load packages
+library(readxl)
+library(metafor)
+# Import data
+df1 <- read_excel('data/Exercise2.xlsx')
+```
+
+\newpage
+
+# Question a
+
+Perform a fixed effects meta-analysis. How large is the overall effect? Is there evidence for heterogeneity?
+
+```{r}
+FEM1 <- rma (yi=g, vi=SE^2, data=df1, method='FE')
+summary(FEM1)
+```
+
+The mean effect is estimated to be $g =$ `r FEM1$b` , which is small, the effect is significant at 5% alpha level  ($p =$ `r FEM1$pval`). This means that boys shows on average more conformity than girls. 
+
+However, there is high study heterogeneity. The Q test is statistically significant: we reject the null hypothesis of homogeneity.
+
+\newpage
+
+# Question b
+
+Make a forest plot to explore a possible moderating effect of the percentage of authors that are male.
+
+```{r}
+forest(FEM1)
+```
+
+Studies are already ordered with increasing percentage of male authors. From the forest plot we can see that the effect sizes seem to increase with an increasing percentage of male authors. Hence, percentage of male authors is a possible moderator. 
+
+\newpage
+
+# Question c
+
+Is there statistically significant evidence (alfa = .01) for a moderating effect of the percentage of authors that are male?
+
+We can perform a FEM with a  continuous moderator (regression).
+
+```{r}
+FEMR <- rma(yi=g, vi=SE^2, data=df1, mods=Male, method='FE')
+summary(FEMR)
+```
+
+The coefficient associated with the moderator (percentage of male authors) is statistically significant indicating that for a percentage increase in male authors, the effect size (conformity of male participants vs female) is expected to increase by 0.7%. 
+
+\newpage
+
+# Question d
+
+Is it OK to use a fixed effects regression model?
+
+Look at the output of the previous analysis. From the Q test, we cannot reject the null hypothesis of homogeneity (p = .07). However this test suffers from low power. Also, the I^2 indicates that there is still a high amount of heterogeneity, even after accounting for the moderator. So, it would be better to use a REM.
+
+
+```{r}
+REM <- rma(yi=g, vi=SE^2, data=df1, mods=Male, method='REML')
+summary(REM)
+```
+
+* $\tau^2$ is the estimate of the variance between population effect sizes. Here,  $\tau^2 =$ `r REM$tau2`
+
+* $I^2$ is the proportion of total variance that is due to variance between population effect sizes. here $I^2 =$ `r REM$I2`, which is substantial.
+
+Conclusion: even after taking into account the moderator and fitting a REM, there is substantial heterogeneity between studies. 
+
+
+
+

@@ -18,10 +18,8 @@ summary(FEM1)
 # (2b) Make a forest plot to explore a possible moderating effect of
 # the percentage of authors that are male
 
-x <- cumul(FEM1, order=order(df1$Male))
-forest(x)
-## forest(FEM1)
-## As the number of %male authors increases, the effect size increases
+forest(FEM1)
+
 
 
 # (2c) Is there evidence (alpha=1%) for a moderating effect of

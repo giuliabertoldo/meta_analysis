@@ -1,0 +1,31 @@
+---
+title: "Analysis Draft Zhang et al. 2020"
+author: "Giulia Bertoldo"
+date: "4/6/2022"
+output: pdf_document
+---
+
+```{r}
+library(readxl)
+library(metafor)
+
+# Import data
+df1 <- read_excel('data_stress.xlsx')
+str(df1)
+
+# REM
+model1<- rma(yi = g, vi = se^2, data = df1, method='REML')
+summary(model1)
+
+funnel(model1)
+
+trimfill(model1)
+
+# Three-level model
+multilevel3 <- rma.mv(yi = g,
+                      V = se^2,
+                      random = list(~1 | studyID/effectsizeID),
+                      data = df1)
+summary(multilevel3)
+
+```

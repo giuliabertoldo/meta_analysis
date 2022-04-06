@@ -1,0 +1,10 @@
+---
+title: "Exercise 6"
+author: "Giulia Bertoldo"
+date: "4/6/2022"
+output: pdf_document
+---
+
+# Dataset description
+
+Re-execute the meta-analysis of diagnostic odds ratios from the AuditC-example that comes with the mada-package. Calculate the log odds ratio’s using the metafor- package. Re-meta-analyze the log odds ratio’s using the restricted maximum likelihood procedure in metafor (method = “REML”). Also use the DerSimonian & Laird approach implemented in the metafor-package (method = “DL”). Compare the mean log odds ratio with corresponding 95% confidence interval, as well as the estimated between-study variance.

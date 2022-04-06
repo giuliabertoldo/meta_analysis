@@ -1,0 +1,106 @@
+---
+title: "Exercise 5"
+author: "Giulia Bertoldo"
+date: "4/4/2022"
+output: pdf_document
+---
+
+# Dataset description
+
+Geeraert, Van den Noortgate, Grietens, and Onghena (2004) performed a meta-analysis to study the effects of early prevention programs for families with young children at risk for physical child abuse and neglect. Data are given in the file ‘ABUSE.csv’, and include the study number, the number of the outcome (most of the studies reported on multiple outcomes), the inverse of the sampling variance (W) and a variable indicating whether the outcomes were related to child abuse/neglect directly (such as reports of child abuse; X=1) versus to risk factors (such as a measure of social support; X=2).
+
+```{r}
+# Load packages
+library(readxl)
+library(metafor)
+
+# Import data
+df1 <- read_excel('data/ABUSE.xlsx')
+str(df1)
+```
+
+\newpage 
+
+# Question a
+
+Perform a three-level meta-analysis, taking into account that effects within studies are correlated.
+
+```{r}
+# Add column with sampling variance 
+df1$var <- 1/df1$W
+
+# Three level meta-analysis 
+multilevel3 <- rma.mv(yi = ES, 
+                      V = var, 
+                      random = list(~1 | study/outcome), 
+                      data = df1)
+summary(multilevel3)
+```
+
+* We have 587 outcomes and 40 studies
+
+* Overall effect size estimate is `r multilevel3$b` ($p =$ `r multilevel3$pval`) indicating that the program has a positive effect, on average. 
+
+* Homogeneity test: We reject the null hypothesis of homogeneity. There is significant heterogeneity. We can decompose the variance in two parts:
+  + variance between studies: `r multilevel3$sigma2[1]`
+  + variance between outcomes within study: `r multilevel3$sigma2[2]`
+Hence, there is slightly more variance between studies than between outcomes within study.  
+
+* Addition: Use $I^2$ to estimate how much heterogeneity there is at each level
+\newpage
+
+# Question b
+
+Compare the results with the results of an ordinary (two-level) meta-analysis, considering all effect sizes as coming from independent studies. Are you surprised?
+
+```{r}
+# Two level meta-analysis 
+multilevel2 <- rma.mv(yi = ES, V = var, data = df1)
+summary(multilevel2)
+```
+
+* The pooled effect size is slightly smaller in the two-level meta-analysis: `r multilevel2$b`, but still statistically significant
+
+* The standard error of the pooled effect size is smaller in the two level meta-analysis: `r multilevel2$se`. This can be expected because the two-level meta-analysis overestimates the amount of available information by treating outcomes as coming from independent studies. 
+
+\newpage
+
+# Question c (MODERATOR: NO INTERCEPT)
+
+Estimate the mean effect for direct measures and the mean effect on risk factors.
+
+```{r}
+# Testing the moderator effect of X
+moderator <- rma.mv(yi = ES, V = var, data = df1, 
+                    random = ~1 | study/outcome, 
+                    mods = ~ factor(X)-1)
+
+summary(moderator)
+```
+* *mods = ~ factor(X)-1* : We include the moderator X as a categorical variable and we do not include an intercept in the model (-1). In this way we obtain the mean effect for each category.  
+
+* The variance between studies is still larger than the variance between outcomes  
+
+* The test of residual heterogeneity shows that after accounting for the moderator, there is still significant heterogeneity 
+
+* The mean effect for the direct effect is `r moderator$b[1]` and we reject the null hypothesis that the effect is equal to zero
+
+* The mean effect for the risk factors is `r moderator$b[2]` and we reject the null hypothesis that the effect is equal to zero
+
+\newpage
+
+# Question d: MODERATOR (WITH INTERCEPT)
+
+Also estimate and test the difference between these means.
+
+```{r}
+# Testing the moderator effect of X
+moderator2 <- rma.mv(yi = ES, V = var, data = df1, 
+                    random = ~1 | study/outcome, 
+                    mods = ~ factor(X))
+
+summary(moderator2)
+```
+
+By including the intercept, one of the categories is considered as a reference category, and an estimate is given for the contrast between the reference category and the second category. Note that the model fit is exactly the same. Both models are indeed equivalent (the parameters of one model can be derived exactly from the parameters from the other model). We see that the average effect for the risk factors is 0.0382 units higher. The difference is statistically not significant (p = .33, as obtained both from the Q-test for the moderator and from the test of the contrast).
+

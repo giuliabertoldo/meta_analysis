@@ -1,0 +1,6 @@
+---
+title: "Meta-analysis based on Sisks et al. (2018) - V.1"
+author: "Giulia Bertoldo"
+date: "4/7/2022"
+output: pdf_document
+---

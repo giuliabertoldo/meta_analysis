@@ -1,0 +1,131 @@
+---
+title: "First look analysis of Sisks et al. 2018"
+author: "Giulia Bertoldo"
+date: "4/7/2022"
+output: pdf_document
+---
+
+# To do 
+
+* The effect size measure is the correlation coefficient. It is unclear if in the paper they transformed it or not. 
+
+* Question: When we use Fisher's Z transform in metafor, is the output reporting the correlation as Pearson correlation or as Z?
+
+
+* In 3-level we assume that outcomes are nested within studies. However, a more accurate data structure would be: outcomes nested within samples nested within studies. This would correspond to a 4-level model. Is it possible to implement this and compare it to a 3-level model? 
+
+# Notes: 
+
+* Benningfield (2013) - S2, S3, S4 was: "sample overlaps with Hendricks (2012)". 
+
+* Hendricks, J. (2012). The effect of gender and implicit theories of math ability on math
+interest and achievement. Unpublished specialist project, Western Kentucky
+University, Bowling Green, Kentucky.
+    + The sample consisted of a total of 1802 students, which included 934 males and 868 females. There were 332 second grade students, 363 third grade students, 406 fourth grade students, 390 fifth grade students, and 311 sixth grade students.
+
+
+* Benningfield, S. (2013). The effects of gender and implicit theories on science achievement and interest in elementary-aged students. Unpublished specialist project, Western Kentucky University.
+    + The sample consisted of a total of 1,910 students. There were 369 second grade students, 382 third grade students, 354 fourth grade students, 409 fifth grade students, and 396 sixth grade students. Of the total number of students, 986 were female and 924 were male.
+    + Decision: We have 3 difference samples (S2, S3, S4: 3rd, 4th, 5th) grade. It is unclear if they are the same sample in Hendricks, as written in the excel or not, because when quickly comparing the two papers, the samples sizes are different (see above). For the moment, I decided to code them as separate samples with the codes: 163, 164, 165 (colum Sample#)  
+  
+  
+
+# Analysis: Meta-analysis 1
+
+## r not transformed
+```{r}
+library(readxl)
+library(metafor)
+
+# Import data
+df1 <- read_excel('data/mindset.xlsx', sheet = 'Meta-analysis 1')
+str(df1)
+
+# Inspect column names 
+names(df1)
+
+# Rename columns: Document #, Study #, Sample #, ES # 
+names(df1)[names(df1)=="Document #"] <- "DocumentID"
+names(df1)[names(df1)=="Study #"] <- "StudyID"
+names(df1)[names(df1)=="Sample #"] <- "SampleID"
+names(df1)[names(df1)=="ES #"] <- "ESID"
+
+# Inspect column names 
+names(df1)
+
+# Look at distribution of r 
+qqnorm(df1$r)
+qqline(df1$r)
+hist(df1$r)
+shapiro.test(df1$r)
+ks.test(df1$r, 'pnorm')
+
+# FEM
+FEM <- rma(yi=r, vi=Variance, data=df1, method='FE')
+summary(FEM)
+
+# REM
+# rma(yi=r, vi=df1$`Adjusted Variance`, data=df1, method='REML') # Use the adjusted variance for dependent effect sizes
+REM <- rma(yi=r, vi=Variance, data=df1, method='REML')
+summary(REM)
+
+# Funnel plot
+funnel(REM)
+
+# Trim and fill
+trimfill(REM)
+
+```
+
+## r transformed
+```{r}
+## calculate r-to-z transformed correlations and corresponding sampling variances
+df2 <- escalc(ri = r, ni = N, measure = 'ZCOR',  data = df1)
+head(df2)
+
+# Look at distribution of yi
+qqnorm(df2$yi)
+qqline(df2$yi)
+hist(df2$yi)
+shapiro.test(df2$yi)
+ks.test(df2$yi, 'pnorm')
+
+### meta-analysis of the transformed correlations using a random-effects model
+REM2 <- rma(yi = yi, vi = vi , data = df2)
+summary(REM2)
+
+### average correlation with 95% CI
+predict(REM2, transf=transf.ztor)
+
+# Funnel
+funnel(REM2)
+
+# Trim and fill 
+trimfill(REM2)
+```
+## 3-level model with r transformed
+
+```{r}
+# Three level meta-analysis 
+multilevel3 <- rma.mv(yi = yi, 
+                      V = vi, 
+                      random = list(~1 | StudyID/ESID), 
+                      data = df2)
+summary(multilevel3)
+
+# Two level model 
+multilevel2 <- rma.mv(yi = yi, 
+                      V = vi, 
+                      data = df2)
+summary(multilevel2)
+```
+
+# Hypotheses
+
+* If their method under-corrects, I expect to find larger standard errors with the 3-level model 
+
+* If their method over-corrects, I expect to find smaller standard errors with the 3-level model
+
+* Also the average effect size estimate may be different because studies that previously were assigned a certain weight based on their adjusted sample size may have a different contribution in the 3-level analysis.  
+
+

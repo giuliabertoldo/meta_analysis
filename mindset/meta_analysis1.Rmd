@@ -4,3 +4,228 @@ author: "Giulia Bertoldo"
 date: "4/7/2022"
 output: pdf_document
 ---
+
+
+```{r}
+# Load packages
+library(tidyverse)
+library(meta)
+library(readxl)
+
+# Import data
+df1 <- read_excel('data/mindset.xlsx', sheet = 'Meta-analysis 1')
+```
+
+\newpage
+
+# Data cleaning
+
+```{r}
+# Glimpse data
+glimpse(df1)
+
+# Rename columns
+df2 <- rename(df1, 
+             document_id = 'Document #', 
+             study_id = 'Study #',
+             sample_id = 'Sample #',
+             sample_country = 'Sample Country',
+             es_id = 'ES #',
+             reference = 'Reference', 
+             n = N, 
+             adjusted_n = 'Adjusted N', 
+             student_description = 'Student Description', 
+             school_level = 'School Level', 
+             development_stage = 'Development Stage', 
+             risk_status = 'Risk status', 
+             ses = SES, 
+             ms_measure = 'MS Measure', 
+             ms_measure_description = 'MS Measure Description', 
+             mindset_type = 'Mindset Type', 
+             achievement_measure_description = 'Achievement Measure Description', 
+             academic_achievement_measure_type = 'Academic Achievement Measure Type',
+             lab_based = 'Lab-based', 
+             published = 'Published',
+             es_type = 'ES type', 
+             calculation = 'Calculation', 
+             variance = 'Variance', 
+             adjusted_variance = 'Adjusted Variance', 
+             is_significant = 'Significant?', 
+             growth_m = 'Growth M',
+             growth_sd = 'Growth SD',
+             other_m = 'Other M', 
+             other_sd = 'Other SD', 
+             cohen_d = "Cohen's d",
+             calculated_r = 'Calculated r', 
+             notes = Notes)
+          
+
+# Check that variable types is correct
+glimpse(df2)
+
+# Change school_level from character to factor 
+df2$school_level <- as.factor(df2$school_level)
+levels(df2$school_level)
+
+# Change development_stage from character to factor
+df2$development_stage <- as.factor(df2$development_stage)
+levels(df2$development_stage)
+
+# Convert all "Wide Range" level to "Wide range"
+# Does not work! TOBEDONE
+for (i in length(df2$development_stage)) {
+  if (df2$development_stage[i] == 'Wide Range') {
+    df2$development_stage[i] <- 'Wide range'}  
+} 
+
+# Change risk_status from character to factor
+# TOBEDONE: What is the meaning of '.'? Change to NA?
+df2$risk_status <- as.factor(df2$risk_status)
+levels(df2$risk_status)
+
+# Change ses from character to factor
+df2$ses <- as.factor(df2$ses)
+levels(df2$ses)
+
+# Change mindset_type from character to factor
+df2$mindset_type <- as.factor(df2$mindset_type)
+levels(df2$mindset_type)
+
+# Change academic_achievement_measure_type from character to factor
+df2$academic_achievement_measure_type <- as.factor(df2$academic_achievement_measure_type)
+levels(df2$academic_achievement_measure_type)
+
+# Change lab_based from character to factor
+df2$lab_based <- as.factor(df2$lab_based)
+levels(df2$lab_based)
+
+# Change published from character to factor
+df2$published <- as.factor(df2$published)
+levels(df2$published)
+
+# Change es_type from character to factor
+df2$es_type <- as.factor(df2$es_type)
+levels(df2$es_type)
+
+# Change is_significant from character to factor
+df2$is_significant <- as.factor(df2$is_significant)
+levels(df2$is_significant)
+
+```
+
+\newpage
+
+# Meta-analysis 1
+
+* REM
+
+* REML to estimate tau 
+
+* No hakn correction
+
+```{r}
+meta1 <- metacor(cor = r, 
+                 n = n, 
+                 studlab = reference, 
+                 data= df2, 
+                 fixed = FALSE, 
+                 random = TRUE, 
+                 method.tau = 'REML', 
+                 hakn = FALSE, 
+                 title = "Mindset and Academic Achievement")
+meta1
+```
+* `r meta1$k` studies were combined in the meta-analysis
+
+* Estimated correlation is `r meta1$TE.random` with standard error  `r meta1$seTE.random` with 95% confidence interval [`r meta1$lower.random`, `r meta1$upper.random`], which excludes zero. 
+
+* $\tau^2$, the between-study variance, is `r meta1$tau2` with 95% confidence interval [`r meta1$lower.tau2`, `r meta1$upper.tau2`], which does not include zero. Indicates heterogeneity.   
+
+\newpage
+
+# Meta-analysis 2: hakn = TRUE
+
+Change from Meta-analysis 1 only one thing: 
+
+* Apply the hakn correction to control for the uncertainty in our estimate of the between-study heterogeneity. 
+
+```{r}
+meta2 <- metacor(cor = r, 
+                 n = n, 
+                 studlab = reference, 
+                 data= df2, 
+                 fixed = FALSE, 
+                 random = TRUE, 
+                 method.tau = 'REML', 
+                 hakn = TRUE, 
+                 title = "Mindset and Academic Achievement")
+meta2
+```
+
+Conclusion: The confidence interval is slightly larger than meta1, and the test is based on a t-distribution instead of a z-distribution. The estimate stays the same. 
+
+Applying the correction does not change any conclusion, so I will not apply it in subsequent analyses. 
+
+\newpage
+
+#  Meta-analysis 3: method.tau = 'DL'
+```{r}
+meta3 <- metacor(cor = r, 
+                 n = n, 
+                 studlab = reference, 
+                 data= df2, 
+                 fixed = FALSE, 
+                 random = TRUE, 
+                 method.tau = 'DL', 
+                 hakn = FALSE, 
+                 title = "Mindset and Academic Achievement")
+meta3
+```
+
+\newpage
+
+#  Meta-analysis 4: method.tau = 'PM'
+```{r}
+meta4 <- metacor(cor = r, 
+                 n = n, 
+                 studlab = reference, 
+                 data= df2, 
+                 fixed = FALSE, 
+                 random = TRUE, 
+                 method.tau = 'PM', 
+                 hakn = FALSE, 
+                 title = "Mindset and Academic Achievement")
+meta4
+```
+
+\newpage
+
+#  Meta-analysis 5: method.tau = 'EB'
+```{r}
+meta5 <- metacor(cor = r, 
+                 n = n, 
+                 studlab = reference, 
+                 data= df2, 
+                 fixed = FALSE, 
+                 random = TRUE, 
+                 method.tau = 'EB', 
+                 hakn = FALSE, 
+                 title = "Mindset and Academic Achievement")
+meta5
+```
+
+\newpage
+
+#  Meta-analysis 6: method.tau = 'SJ'
+```{r}
+meta6 <- metacor(cor = r, 
+                 n = n, 
+                 studlab = reference, 
+                 data= df2, 
+                 fixed = FALSE, 
+                 random = TRUE, 
+                 method.tau = 'SJ', 
+                 hakn = FALSE, 
+                 title = "Mindset and Academic Achievement")
+meta6
+```

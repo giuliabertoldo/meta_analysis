@@ -1,0 +1,257 @@
+---
+title: "Meta-analysis based on Sisks et al. (2018) - V.2"
+author: "Giulia Bertoldo"
+date: "4/10/2022"
+output: 
+  pdf_document:
+    toc: true 
+---
+
+```{r}
+# Load packages
+library(tidyverse)
+library(meta)
+library(metafor)
+library(readxl)
+
+# Import data
+df1 <- read_excel('data/mindset.xlsx', sheet = 'Meta-analysis 1')
+```
+
+\newpage
+
+# Data cleaning 
+
+```{r}
+# Glimpse data
+glimpse(df1)
+```
+
+```{r}
+# Rename columns
+df2 <- rename(df1, 
+             document_id = 'Document #', 
+             study_id = 'Study #',
+             sample_id = 'Sample #',
+             sample_country = 'Sample Country',
+             es_id = 'ES #',
+             reference = 'Reference', 
+             n = N, 
+             adjusted_n = 'Adjusted N', 
+             student_description = 'Student Description', 
+             school_level = 'School Level', 
+             development_stage = 'Development Stage', 
+             risk_status = 'Risk status', 
+             ses = SES, 
+             ms_measure = 'MS Measure', 
+             ms_measure_description = 'MS Measure Description', 
+             mindset_type = 'Mindset Type', 
+             achievement_measure_description = 'Achievement Measure Description', 
+             academic_achievement_measure_type = 'Academic Achievement Measure Type',
+             lab_based = 'Lab-based', 
+             published = 'Published',
+             es_type = 'ES type', 
+             calculation = 'Calculation', 
+             variance = 'Variance', 
+             adjusted_variance = 'Adjusted Variance', 
+             is_significant = 'Significant?', 
+             growth_m = 'Growth M',
+             growth_sd = 'Growth SD',
+             other_m = 'Other M', 
+             other_sd = 'Other SD', 
+             cohen_d = "Cohen's d",
+             calculated_r = 'Calculated r', 
+             notes = Notes)
+         
+
+# Check that variable types is correct
+glimpse(df2)
+
+```
+
+```{r}
+# Change school_level from character to factor 
+df2$school_level <- as.factor(df2$school_level)
+levels(df2$school_level)
+
+# Change development_stage from character to factor
+df2$development_stage <- as.factor(df2$development_stage)
+levels(df2$development_stage)
+# Convert all "Wide range" level to "Wide Range"
+df2$development_stage <- recode_factor(df2$development_stage, 
+                                       'Wide range' = 'Wide Range')
+levels(df2$development_stage)
+
+# Change risk_status from character to factor
+df2$risk_status <- as.factor(df2$risk_status)
+levels(df2$risk_status)
+## Note: The category '.' applies to 4 rows 
+## These are studies from which it was not possible to determine the risk status
+## df2 %>% 
+##   filter(risk_status == '.')
+
+# Change ses from character to factor
+df2$ses <- as.factor(df2$ses)
+levels(df2$ses)
+
+# Change mindset_type from character to factor
+df2$mindset_type <- as.factor(df2$mindset_type)
+levels(df2$mindset_type)
+
+# Change academic_achievement_measure_type from character to factor
+df2$academic_achievement_measure_type <- as.factor(df2$academic_achievement_measure_type)
+levels(df2$academic_achievement_measure_type)
+
+# Change lab_based from character to factor
+df2$lab_based <- as.factor(df2$lab_based)
+levels(df2$lab_based)
+
+# Change published from character to factor
+df2$published <- as.factor(df2$published)
+levels(df2$published)
+
+# Change es_type from character to factor
+df2$es_type <- as.factor(df2$es_type)
+levels(df2$es_type)
+
+# Change is_significant from character to factor
+df2$is_significant <- as.factor(df2$is_significant)
+levels(df2$is_significant)
+```
+
+\newpage 
+
+# Meta-analysis 1: Random-effects model (REM)
+
+Other notes: REML to estimate tau, no hakn correction.
+
+```{r}
+# Create dataframe for metafor: 
+# Calculate r-to-z transformed correlations and corresponding sampling variances
+df3 <- escalc(measure="ZCOR", ri=r, ni=n, data=df2)
+
+# REM of the transformed correlations 
+meta1 <- rma (yi = yi, 
+                  vi = vi,
+                  measure = 'ZCOR',
+                  data = df3)
+meta1
+```
+
+## Pooled effect size 
+
+* Number of studies = 273 
+
+* estimate = 0.1071, with 95% CI [0.0869, 0.1272], z = 10.4110 and p-value <.0001. **Question: Is the estimate a Pearson correlation or Fisher's z**?
+
+```{r}
+# Transform from z to r and see if the values you obtain make sense: 
+transf.ztor(0.1071)
+transf.ztor(0.0869)
+transf.ztor(0.1272)
+
+# From examples: https://wviechtb.github.io/metadat/reference/dat.molloy2014.html
+# Documentation: predict.rma
+## returns the estimated (average) outcome in the hypothetical population of studies from which the set of studies are assumed to a random selection. Same estimate of the intercepet in REM.
+predict(meta1, digits=3, transf=transf.ztor)
+```
+* When transforming, the values that I obtain do make sense. The transformed values align with the values from the outuput of meta, which I know that they are already back-transformed. So, I guess I need to use the transformed values: 
+
+* estimate = 0.107, with 95% CI [0.087, 0.127] 
+
+* The prediction interval ranges is $r = [-0.161, 0.359]$ . This means that it is possible that some future studies will find a negative correlation between mindset and academic achievement based on the present evidence. But the interval spans also over to a substantial positive effect. 
+
+\newpage
+
+### Analysis of between-studies heterogeneity
+
+* Cochrane's Q: If there was no heterogeneity this statistics should be distributed as a $\chi^2$ distribution with 272 degrees of freedom. In our meta-analysis $Q = 8958.24$  with p < .0001. We reject the null hypothesis of homogeneity. There is evidence for heterogeneity. 
+
+```{r}
+# Obtain confidence interval for tau^2, I^2, H
+# Interval for tau^2 is obtained iteratively either via the Q-profile method or via the generalized Q-statistic method
+# The square root of the inter- val bounds is also returned for easier interpretation.
+# Confidence intervals for I2 and H2 are also provided (Higgins & Thompson, 2002). Since I2 and H2 are just monotonic transfor- mations of tau2 the confidence intervals for I2 and H2 are also exact
+confint.rma.uni(meta1)
+
+```
+* $I^2 = 95.68%$ (95%CI:95.08 - 97.10%), meaning that about 96% of the variability in effect sizes is due between-study heterogeneity. This can be considered substantial heterogeneity (according to Thomppson's rule of thumb).
+
+* H^2 is 23.13. Values greater than 1 indicate heterogeneity.
+
+* $\tau^2$, the between-study variance, is 0.0187 with 95% confidence interval [0.016, 0.0284], which does not include zero. Indicates heterogeneity. The confidence interval for $\tau^2$ was calculated based on the Q-profile method or the generalized Q-statistic method.
+
+* $\tau$, is the 'standard deviation of the true effect size and [...] it tells us something about the range of the true effect sizes. The true effect sizes have an estimated standard deviation of $SD = 0.1369$ expressed on the scale of (**Question: Pearson correlation or Fisher's Z?)**
+
+\newpage
+
+## Forest plot 
+
+```{r}
+pdf(file='forestplot_metafor.pdf', width = 8, height = 30)
+forest(meta1,
+       header = TRUE, 
+       transf = transf.ztor,
+       showweights = TRUE, 
+       order = 'obs',
+       efac = 0.2)
+
+### add text with Q-value, dfs, p-value, and I^2 statistic
+# https://www.metafor-project.org/doku.php/plots:forest_plot
+text(-4.6, -3, pos=4, cex=0.75, bquote(paste("RE Model (Q = ",
+     .(formatC(meta1$QE, digits=2, format="f")), ", df = ", .(meta1$k - meta1$p),
+     ", p = ", .(formatC(meta1$QEp, digits=2, format="f")), "; ", I^2, " = ",
+     .(formatC(meta1$I2, digits=1, format="f")), "%)")))
+dev.off()
+
+```
+
+Notes: 
+
+* Many of the more precise studies (smaller confidence interval), have an average correaltion between -0.03 and 0.24
+
+\newpage
+
+## Subgroup analysis 
+
+Sisks et al. (2018) found as **significant** moderators: 
+
+* Student factors:
+    + Developmental stage of the student: children, adolescents, adults
+
+* Developmental stage as a moderator of mind-set on GPA 
+
+Sisks et al. (2018) found as **non- significant** moderators: 
+
+* Student factors:
+    + Academic risk status: low-risk, moderately at risk, highly at-risk students
+    + Socioeconomic status 
+
+* Academic achievement measure: Course exam, Course grade, GPA, Standardized test  
+
+### Developmental stage
+
+```{r}
+levels(df3$development_stage)
+# Subset to exclude "Wide Range" 
+df3_develop <- filter(df3, 
+                      (development_stage == "Adolescents") | 
+                        (development_stage == "Adults") |
+                        (development_stage == "Children"))
+# Adjust labels
+df3_develop$development_stage <- droplevels(df3_develop$development_stage)
+levels(df3_develop$development_stage)
+
+# Fit meta-analysis: DIFFERENT TAU^2
+meta1_develop <- rma (yi = yi,
+                      vi = vi,
+                      measure = 'ZCOR',
+                      data = df3_develop,
+                      mods = ~ development_stage-1)
+meta1_develop
+
+# TO-BE-DONE: The coefficients are in Fisher's Z? Try to transform back to R using a function
+# TO-BE-DONE: How to do all pairwise comparisons? 
+
+```
+

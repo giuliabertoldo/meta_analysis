@@ -73,17 +73,18 @@ levels(df2$school_level)
 df2$development_stage <- as.factor(df2$development_stage)
 levels(df2$development_stage)
 
-# Convert all "Wide Range" level to "Wide range"
-# Does not work! TOBEDONE
-for (i in length(df2$development_stage)) {
-  if (df2$development_stage[i] == 'Wide Range') {
-    df2$development_stage[i] <- 'Wide range'}  
-} 
+# Convert all "Wide range" level to "Wide Range"
+df2$development_stage <- recode_factor(df2$development_stage, 
+                                       'Wide range' = 'Wide Range')
+levels(df2$development_stage)
 
 # Change risk_status from character to factor
-# TOBEDONE: What is the meaning of '.'? Change to NA?
 df2$risk_status <- as.factor(df2$risk_status)
 levels(df2$risk_status)
+## Note: The category '.' applies to 4 rows 
+## These are studies from which it was not possible to determine the risk status
+df2 %>% 
+  filter(risk_status == '.')
 
 # Change ses from character to factor
 df2$ses <- as.factor(df2$ses)
@@ -1465,6 +1466,84 @@ drapery(meta1,
         type = 'pval', 
         legend = FALSE)
 ```
+
+\newpage 
+
+## Subgroup analysis 
+
+Sisks et al. (2018) found as **significant** moderators: 
+
+* Student factors:
+    + Developmental stage of the student: children, adolescents, adults
+
+* Developmental stage as a moderator of mind-set on GPA 
+
+Sisks et al. (2018) found as **non- significant** moderators: 
+
+* Student factors:
+    + Academic risk status: low-risk, moderately at risk, highly at-risk students
+    + Socioeconomic status 
+
+* Academic achievement measure: Course exam, Course grade, GPA, Standardized test  
+
+    
+```{r}
+# Significant
+levels(df2$development_stage)
+
+# Non-significants
+levels(df2$risk_status)
+levels(df2$ses)
+levels(df2$academic_achievement_measure_type)
+```
+
+### Developmental stage
+
+```{r}
+levels(df2$development_stage)
+# Subset to include only studies with homogeneous groups
+# meaning: exclude "Wide range" and "Wide Range"
+df2_develop <- filter(df2, 
+                      (development_stage == "Adolescents") | 
+                        (development_stage == "Adults") |
+                        (development_stage == "Children"))
+
+df2_develop$development_stage <- droplevels(df2_develop$development_stage)
+levels(df2_develop$development_stage)
+
+# Fit meta-analysis: DIFFERENT TAU^2
+meta1_develop1 <- metacor(cor = r, 
+                         n = n, 
+                         studlab = reference, 
+                         data= df2_develop, 
+                         fixed = FALSE, 
+                         random = TRUE, 
+                         method.tau = 'REML', 
+                         hakn = FALSE, 
+                         title = "Mindset and Academic Achievement", 
+                         prediction = TRUE, 
+                         subgroup = development_stage, 
+                         tau.common = FALSE)
+meta1_develop1
+
+# Fit meta-analysis: EQUAL TAU^2
+meta1_develop2 <- metacor(cor = r, 
+                         n = n, 
+                         studlab = reference, 
+                         data= df2_develop, 
+                         fixed = FALSE, 
+                         random = TRUE, 
+                         method.tau = 'REML', 
+                         hakn = FALSE, 
+                         title = "Mindset and Academic Achievement", 
+                         prediction = TRUE, 
+                         subgroup = development_stage, 
+                         tau.common = TRUE)
+meta1_develop2
+
+## TO BE DONE: HOW TO COMPARE THE THREE CATEGOREIS (ANOVA WITH CORRECTION FOR MULTIPLE COMPARISON) 
+```
+
 \newpage
 
 ## Multilevel meta-analysis 
@@ -1714,6 +1793,38 @@ anova(meta1_multi, meta1_2level)
 
 The three-level model has better fit: AIC and BIC are lower for the 3-level model and the LRT is significant 
 
+
+### Subgroup analysis 
+
+#### Developmental stage
+
+```{r}
+# Check levels 
+levels(df3$development_stage)
+
+# Include only levels of interest
+df3_develop <- filter(df3, 
+                      (development_stage == "Adolescents") | 
+                        (development_stage == "Adults") |
+                        (development_stage == "Children"))
+
+levels(df3_develop$development_stage)
+
+# Drop level "Wide Range" 
+df3 %>% filter(development_stage == "Wide Range")
+df3_develop$development_stage <- droplevels(df3_develop$development_stage)
+levels(df2_develop$development_stage)
+
+meta1_multi_develop <- rma.mv(yi = yi, 
+                              V = vi, 
+                              random = list(~1 | study_id/es_id), 
+                              data = df3_develop, 
+                              mods = ~factor(development_stage)-1)
+summary(meta1_multi_develop)
+
+## TO BE DONE: HOW TO COMPARE THE THREE CATEGOREIS (ANOVA WITH CORRECTION FOR MULTIPLE COMPARISON) 
+
+```
 
 
 

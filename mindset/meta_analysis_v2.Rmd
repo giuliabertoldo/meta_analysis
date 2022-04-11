@@ -7,15 +7,71 @@ output:
     toc: true 
 ---
 
+# Packages and Data
+
 ```{r}
 # Load packages
 library(tidyverse)
 library(meta)
 library(metafor)
 library(readxl)
+library(gridExtra) # for arranging qqplots
+library(multcomp) # for multiple comparisons
 
 # Import data
 df1 <- read_excel('data/mindset.xlsx', sheet = 'Meta-analysis 1')
+```
+
+```{r}
+# FUNCTION TO CALCULATE I^2 FOR EACH LEVEL IN A 3-LEVEL MODEL
+
+# Formulae 4.29 Chen 2015 + Paper
+# Higgins and Thompson (2002) preferred to define the typical within-study
+# sampling variance ... using the Q statistic:
+
+
+# Inputs:
+# v: variance (e.g. df$vi)
+# k: number of studies (e.g. length(df$vi))
+# rma_obj: meta-analysis object (e.g. multilevel1)
+
+multilevel_i2 <- function(v, k, rma_obj)
+{
+  k <- length(v)
+  list.inverse.variances <- 1 /(v)
+  sum.inverse.variances <- sum(list.inverse.variances)
+  numerator <- (k - 1) * sum.inverse.variances
+
+  squared.sum.inverse.variances <- (sum.inverse.variances)^2
+
+  list.inverse.variances.square <- 1 / (v^2)
+  sum.inverse.variances.square <- sum(list.inverse.variances.square)
+  denominator <- squared.sum.inverse.variances - sum.inverse.variances.square
+
+  estimated.sampling.variance <- numerator / denominator
+
+  I2_1 <- (estimated.sampling.variance) / (rma_obj$sigma2[1] + rma_obj$sigma2[2] + estimated.sampling.variance)
+
+  I2_2 <- (rma_obj$sigma2[1]) / (rma_obj$sigma2[1] + rma_obj$sigma2[2] + estimated.sampling.variance)
+
+  I2_3 <- (rma_obj$sigma2[2]) / (rma_obj$sigma2[1] + rma_obj$sigma2[2] + estimated.sampling.variance)
+
+  I2_1 <- round((amountvariancelevel1 <- I2_1 * 100),2)
+  I2_2 <- round((amountvariancelevel2 <- I2_2 * 100),2)
+  I2_3 <- round((amountvariancelevel3 <- I2_3 * 100),2)
+
+  col1 <- rbind(I2_1, I2_2, I2_3)
+  col2 <- rbind('Level 1', 'Level 2', 'Level 3')
+  I2_partition <- data.frame(col1, col2)
+  names(I2_partition) <- c('I2', 'Level')
+  print(I2_partition)
+
+  # Barplot
+  ggplot(I2_partition, aes(x="", y=I2, fill=Level))+
+    geom_bar(width = 1, stat = "identity") +
+    theme_light()
+
+}
 ```
 
 \newpage
@@ -119,6 +175,33 @@ df2$is_significant <- as.factor(df2$is_significant)
 levels(df2$is_significant)
 ```
 
+```{r}
+# Create dataframe for metafor: 
+# Calculate r-to-z transformed correlations and corresponding sampling variances
+df3 <- escalc(measure="ZCOR", ri=r, ni=n, data=df2)
+```
+
+```{r}
+# Explore graphically Fisher's Z
+ggplot(df3, aes(x=yi)) +
+  geom_histogram(aes(y=..density..), colour = 'black', fill = "white") +
+  geom_density(alpha=.2, fill="#FF6666") +
+  theme_classic()
+
+# Fisher's Z
+qqplot_z <- ggplot(df3, aes(sample=yi)) +
+  stat_qq() +
+  stat_qq_line() +
+  theme_classic()
+
+# Original r 
+qqplot_r <- ggplot(df3, aes(sample=r))+
+  stat_qq() +
+  stat_qq_line() +
+  theme_classic()
+
+grid.arrange(qqplot_r, qqplot_z, ncol=2)
+```
 \newpage 
 
 # Meta-analysis 1: Random-effects model (REM)
@@ -126,23 +209,20 @@ levels(df2$is_significant)
 Other notes: REML to estimate tau, no hakn correction.
 
 ```{r}
-# Create dataframe for metafor: 
-# Calculate r-to-z transformed correlations and corresponding sampling variances
-df3 <- escalc(measure="ZCOR", ri=r, ni=n, data=df2)
-
 # REM of the transformed correlations 
 meta1 <- rma (yi = yi, 
                   vi = vi,
                   measure = 'ZCOR',
-                  data = df3)
-meta1
+                  data = df3, 
+                  slab = es_id)
+summary(meta1, digits = 3)
 ```
 
 ## Pooled effect size 
 
 * Number of studies = 273 
 
-* estimate = 0.1071, with 95% CI [0.0869, 0.1272], z = 10.4110 and p-value <.0001. **Question: Is the estimate a Pearson correlation or Fisher's z**?
+* estimate = 0.1071, with 95% CI [0.0869, 0.1272], z = 10.4110 and p-value <.0001. However, this Fisher's z, so, we need to transform it back to Pearson r for interpretation
 
 ```{r}
 # Transform from z to r and see if the values you obtain make sense: 
@@ -155,7 +235,6 @@ transf.ztor(0.1272)
 ## returns the estimated (average) outcome in the hypothetical population of studies from which the set of studies are assumed to a random selection. Same estimate of the intercepet in REM.
 predict(meta1, digits=3, transf=transf.ztor)
 ```
-* When transforming, the values that I obtain do make sense. The transformed values align with the values from the outuput of meta, which I know that they are already back-transformed. So, I guess I need to use the transformed values: 
 
 * estimate = 0.107, with 95% CI [0.087, 0.127] 
 
@@ -172,7 +251,7 @@ predict(meta1, digits=3, transf=transf.ztor)
 # Interval for tau^2 is obtained iteratively either via the Q-profile method or via the generalized Q-statistic method
 # The square root of the inter- val bounds is also returned for easier interpretation.
 # Confidence intervals for I2 and H2 are also provided (Higgins & Thompson, 2002). Since I2 and H2 are just monotonic transfor- mations of tau2 the confidence intervals for I2 and H2 are also exact
-confint.rma.uni(meta1)
+confint.rma.uni(meta1, digits = 3)
 
 ```
 * $I^2 = 95.68%$ (95%CI:95.08 - 97.10%), meaning that about 96% of the variability in effect sizes is due between-study heterogeneity. This can be considered substantial heterogeneity (according to Thomppson's rule of thumb).
@@ -208,7 +287,55 @@ dev.off()
 
 Notes: 
 
-* Many of the more precise studies (smaller confidence interval), have an average correaltion between -0.03 and 0.24
+* Many of the more precise studies (smaller confidence interval), have an average correlation between -0.03 and 0.24
+
+\newpage
+
+## Caterpillar plot 
+
+```{r}
+# Source code:
+# http://www.metafor-project.org/doku.php/plots:caterpillar_plot 
+### create plot
+forest(df3$yi, df3$vi,
+       xlim=c(-2.5,3.5),        ### adjust horizontal plot region limits
+       order="obs",             ### order by size of yi
+       slab=NA, annotate=FALSE, ### remove study labels and annotations
+       efac=0,                  ### remove vertical bars at end of CIs
+       pch=19,                  ### changing point symbol to filled circle
+       col="gray40",            ### change color of points/CIs
+       psize=2,                 ### increase point size
+       cex.lab=1, cex.axis=1,   ### increase size of x-axis title/labels
+       lty=c("solid","blank"),  ### remove horizontal line at top of plot
+       transf = transf.ztor)  
+ 
+### draw points one more time to make them easier to see
+points(sort(df3$yi), length(df3$vi):1, pch=19, cex=0.5)
+ 
+### add summary polygon at bottom and text
+addpoly(meta1, mlab="", cex=1, col = 'red')
+text(-2, -2, "RE Model", pos=4, offset=0, cex=1)
+```
+
+\newpage
+
+## Outliers and Influential cases
+
+```{r}
+inf <- influence(meta1)
+pdf(file='infleunce.pdf')
+plot(inf)
+dev.off()
+```
+
+```{r}
+### create Baujat plot
+baujat(meta1, symbol="slab")
+```
+```{r}
+# Look at es_id = 9 and 187
+df3  %>% filter(es_id == 9) 
+```
 
 \newpage
 
@@ -230,8 +357,8 @@ Sisks et al. (2018) found as **non- significant** moderators:
 * Academic achievement measure: Course exam, Course grade, GPA, Standardized test  
 
 ### Developmental stage
-
 ```{r}
+# Prepare dataset
 levels(df3$development_stage)
 # Subset to exclude "Wide Range" 
 df3_develop <- filter(df3, 
@@ -241,17 +368,320 @@ df3_develop <- filter(df3,
 # Adjust labels
 df3_develop$development_stage <- droplevels(df3_develop$development_stage)
 levels(df3_develop$development_stage)
+```
 
-# Fit meta-analysis: DIFFERENT TAU^2
-meta1_develop <- rma (yi = yi,
+```{r}
+# Inspect visually the relationship between Fisher's z and the categories 
+# x = developmental_stage y = Fisher's z 
+ggplot(data=df3_develop, mapping = aes(x=development_stage, y = yi)) +
+  geom_dotplot(binaxis='y', 
+               stackdir='center', 
+               stackratio=1.5, 
+               dotsize=0.5,
+               fill="#3399ff") +
+  stat_summary(fun.y=mean, geom="point", shape=18,
+                 size=3, color="#ff5050")+
+  theme_classic()
+
+```
+
+We see overlap in the outcome between the three categories, though it may be that children and adolescents show a higher effect than adults. 
+
+The range of values is larger for adolescents and children compared to adults. Probably this would call for estimating different tau^2 for each group 
+
+Next, I a weighted ANOVA. There are two options: 
+
+* common $\tau^2$: 
+
+* different $\tau^2$
+
+
+```{r}
+# Fit meta-analysis: 
+# COMMON TAU^2: 
+## Same between-study variance within each subgroup (Adolescents, Adults, Children)
+meta1_develop1 <- rma (yi = yi,
                       vi = vi,
                       measure = 'ZCOR',
                       data = df3_develop,
                       mods = ~ development_stage-1)
-meta1_develop
+summary(meta1_develop1, digits = 3)
 
-# TO-BE-DONE: The coefficients are in Fisher's Z? Try to transform back to R using a function
-# TO-BE-DONE: How to do all pairwise comparisons? 
+# Transform the estimates of the differences from z to r 
+transf.ztor(meta1_develop1$b)
+
+# Multiple comparisons
+# https://wviechtb.github.io/metafor/reference/rma.uni.html
+multcomp_develop1 <- glht(meta1_develop1,
+                         linfct=contrMat(c("Adolescents"=1,"Adults"=1,"Children"=1),
+                                         type="Tukey"),test=adjusted("bonferroni"))
+
+summary(multcomp_develop1)
+# Note that the estimate of the differences in the output are Fisher z
+```
+
+```{r}
+# Fit meta-analysis: 
+# DIFFERENT TAU^2 PER SUBGROUP: 
+## Different between-study variance within each subgroup (Adolescents, Adults, Children)
+# https://wviechtb.github.io/metafor/reference/rma.uni.html
+
+# We have to fit 3 models: ado, adu, chi
+meta1_develop2_ado <- rma (yi = yi,
+                           vi = vi,
+                          measure = 'ZCOR',
+                          data = df3_develop,
+                          mods = ~ development_stage-1,
+                          subset = (development_stage=="Adolescents")) 
+summary(meta1_develop2_ado, digits = 3)
+
+meta1_develop2_adu <- rma (yi = yi,
+                           vi = vi,
+                          measure = 'ZCOR',
+                          data = df3_develop,
+                          mods = ~ development_stage-1,
+                          subset = (development_stage=="Adults")) 
+summary(meta1_develop2_adu,  digits = 3)
+
+meta1_develop2_chi <- rma (yi = yi,
+                           vi = vi,
+                          measure = 'ZCOR',
+                          data = df3_develop,
+                          mods = ~ development_stage-1,
+                          subset = (development_stage=="Children")) 
+summary(meta1_develop2_chi, digits =3)
+
+# Compare tau^2 
+tau2_comp <- data.frame(rbind(meta1_develop1$tau2, 
+                        meta1_develop2_ado$tau2,
+                        meta1_develop2_adu$tau2,
+                        meta1_develop2_chi$tau2))
+names(tau2_comp) <- 'tau^2'
+rownames(tau2_comp) <- c('Common', 'Adolescents', 'Adults', 'Children')
+round(tau2_comp, 3)
+
+# Compare I^2
+i2_comp <- data.frame(rbind(meta1_develop1$I2, 
+                        meta1_develop2_ado$I2,
+                        meta1_develop2_adu$I2,
+                        meta1_develop2_chi$I2))
+names(i2_comp) <- 'I^2'
+rownames(i2_comp) <- c('Common', 'Adolescents', 'Adults', 'Children')
+round(i2_comp,2)
+```
+\newpage
+
+## Multilevel meta-analysis 
+
+```{r}
+meta1_multi1 <- rma.mv(yi = yi, 
+                      V = vi, 
+                      random = list(~1 | study_id/es_id), 
+                      data = df3,
+                      slab = es_id)
+
+# QUESTION: I don't have to specify  measure = 'ZCOR'?
+
+summary(meta1_multi1, digits =3)
+```
+* Variance components: 
+    + The between-study variance is sigma^2.1 = 0.0153 (equivalent to tau^2 in REM)- At this level we have 129 studies. 
+    + The within-study variance is sigma^2.2 = 0.0041. At this level we have 273 effect sizes. 
+
+* Estimate: 0.0906. However, this is a Fisher's z, so we have to transform the effect back to a normal correlation: 
+
+```{r}
+round(transf.ztor(meta1_multi1$b), 3)
+round(transf.ztor(meta1_multi1$ci.lb), 3)
+round(transf.ztor(meta1_multi1$ci.ub), 3)
+```
+* The correlation is approximately 0.09 with 95%CI [0.065,0.116] 
+
+* The test for heterogeneity rejects the null hypothesis of homogeneity, "however this is not informative. Instead, we should look at the amount of heterogeneity caputred by each level in our model." "We are interested in within-study variance (level 2) as well as between-study variance (level 3) and not the variance between all effect sizes in the dataset". 
+
+### Testing the within-study variance
+
+```{r}
+# Two-level model without within-study variance 
+
+meta1_multi2 <- rma.mv(yi = yi, 
+                      V = vi, 
+                      random = list(~1 | study_id/es_id), 
+                      data = df3,
+                      slab = es_id,
+                      sigma2 = c(0, NA))
+
+# Perform a likelihood-ratio test to determine the significance of 
+# the within-study variance
+anova(meta1_multi1, meta1_multi2)
 
 ```
 
+* From the LRT we "found significant variability between effect-sizes within studies"
+
+### Testing the between-study variance
+
+
+```{r}
+# Two-level model without between-study variance 
+
+meta1_multi3 <- rma.mv(yi = yi, 
+                      V = vi, 
+                      random = list(~1 | study_id/es_id), 
+                      data = df3,
+                      slab = es_id,
+                      sigma2 = c(NA, 0))
+
+# Perform a likelihood-ratio test to determine the significance of 
+# the within-study variance
+anova(meta1_multi1, meta1_multi3)
+
+```
+
+* "Between-study variance is significant, since the fit of the full model is significantly better than the fit of the reduced model". "We found significant variability between studies"
+
+* However, we would like to know how the total variance is splitted in the different levels. See next section
+
+### Distribution of variance over the three levels of the meta-analytic model 
+
+```{r}
+# I^2 at different levels
+# See function description under 'Packages and data' at the top
+multilevel_i2(v = df3$vi, 
+              k = length(df3$vi),
+              rma_obj = meta1_multi1)
+```
+* Chen, 2015 pg. 92:  "I2 can be interpreted as the proportion of the total variation of the effect size that is due to the between-study heterogeneity"
+
+* 4.17 % of the total variance can be attributed to within-study sampling variance (level-1)
+
+* 75.43 % of the total variance can be attributed to within study variance  (differences between effect sizes within studies)
+
+* 20.4 % of the total variance can be attributed to differences between studies at level 3. 
+
+Conclusion: A lot of the variance is within-studies 
+
+### Subgroup analysis 
+
+#### Developmental stage
+
+```{r}
+# Fit 3-level model with developmental_stage as moderator
+
+meta1_multi1_develop1 <- rma.mv(yi = yi, 
+                                V = vi,
+                                random = list(~1 | study_id/es_id),
+                                data = df3_develop,
+                                slab = es_id,
+                                mods = ~ development_stage -1)
+
+# QUESTION: I don't have to specify  measure = 'ZCOR'?
+summary(meta1_multi1_develop1, digits =3)
+
+# Multiple comparisons
+multcomp_multi1_develop1 <- glht(meta1_multi1_develop1,
+                                 linfct=contrMat(c("Adolescents"=1,"Adults"=1,"Children"=1),
+                                         type="Tukey"),test=adjusted("bonferroni"))
+
+summary(multcomp_multi1_develop1)
+# Note that the estimate of the differences in the output are Fisher z
+```
+
+* Test for residual heterogeneity is significant: there is  significant unexplained variance left between all effect sizes in the data set after publication status has been added to the meta-analytic model 
+
+* Test of moderators: Omnibus test. We reject the null hypothesis of no moderation ?
+Developmental stage is a moderator
+
+* Effects: Adolescents and children significantly different from zero, adults no. 
+
+#####  Examine the residual within-study and between-study variance 
+
+```{r}
+multilevel_i2(df3_develop$vi, 
+              k = length(df3_develop$vi),
+              rma_obj = meta1_multi1_develop1)
+
+```
+
+## Publication bias
+
+### Funnel plot 
+
+```{r}
+# Reference: https://wviechtb.github.io/metafor/reference/funnel.html 
+funnel(meta1, 
+       level=c(90, 95, 99), 
+       shade=c("white", "gray55", "gray75"), 
+       legend=TRUE)
+```
+
+### Egger's regression test
+
+```{r}
+# Reference: https://wviechtb.github.io/metafor/reference/regtest.html
+regtest(meta1, model = 'lm')
+```
+
+We cannot reject the null hypothesis that the intercept is equal to zero. Therefore we do not have evidence for funnel plot asymmetry. ("When there is no publication bias, the expected z score should be scattered around zero. No publication bias means means that the precision is not related to the effect size reported (beta1=0)).
+
+```{r}
+# Manually do calculations 
+df3 %>%
+  mutate(inv_se = 1/sqrt(vi)) %>%
+  lm(yi ~ inv_se, data =.) %>%
+  summary()
+```
+
+```{r}
+# Plot precision vs effect size
+df3 %>%
+  mutate(inv_se = 1/sqrt(vi)) %>%
+  ggplot(mapping = aes(x = inv_se, y =yi)) +
+  geom_point() +
+  geom_abline() +
+  theme_light()
+```
+
+```{r}
+# Check with meta
+library(meta)
+meta_del <- metacor(cor = r, 
+                 n = n, 
+                 studlab = reference, 
+                 data= df2, 
+                 fixed = FALSE, 
+                 random = TRUE, 
+                 method.tau = 'REML', 
+                 hakn = FALSE, 
+                 title = "Mindset and Academic Achievement", 
+                 prediction = TRUE)
+metabias(meta_del, method.bias = 'linreg')
+```
+
+### Trim and Fill method
+
+```{r}
+# Reference: 
+meta1_tf <- trimfill(meta1)
+summary(meta1_tf)
+funnel(meta1_tf, legend=TRUE, cex=1.2)
+```
+\newpage
+
+### Selection models 
+
+#### Three-parameter selection model
+
+```{r}
+meta1_3psm1 <- selmodel(meta1,
+                       type = 'stepfun', 
+                       steps = 0.025)
+summary(meta1_3psm1)
+```
+
+```{r}
+meta1_3psm2 <- selmodel(meta1,
+                       type = 'stepfun', 
+                       steps = 0.05)
+summary(meta1_3psm2)
+```

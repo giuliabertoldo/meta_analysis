@@ -214,7 +214,24 @@ meta1 <- rma (yi = yi,
                   vi = vi,
                   measure = 'ZCOR',
                   data = df3, 
-                  slab = es_id)
+                  slab = es_id, 
+                  method = 'REML')
+summary(meta1, digits = 3)
+```
+\newpage 
+
+# Meta-analysis 2: Random-effects model (REM) - For comparison with Sisks et al. 
+
+Other notes: DL to estimate tau, no hakn correction.
+
+```{r}
+# REM of the transformed correlations 
+meta2 <- rma (yi = yi, 
+                  vi = vi,
+                  measure = 'ZCOR',
+                  data = df3, 
+                  slab = es_id, 
+                  method = 'DL')
 summary(meta1, digits = 3)
 ```
 
@@ -222,23 +239,18 @@ summary(meta1, digits = 3)
 
 * Number of studies = 273 
 
-* estimate = 0.1071, with 95% CI [0.0869, 0.1272], z = 10.4110 and p-value <.0001. However, this Fisher's z, so, we need to transform it back to Pearson r for interpretation
+* estimate = 0.1071, with 95% CI [0.087, 0.127]. However, this Fisher's z, so, we need to transform it back to Pearson r for interpretation
 
 ```{r}
 # Transform from z to r and see if the values you obtain make sense: 
-transf.ztor(0.1071)
-transf.ztor(0.0869)
-transf.ztor(0.1272)
-
-# From examples: https://wviechtb.github.io/metadat/reference/dat.molloy2014.html
-# Documentation: predict.rma
-## returns the estimated (average) outcome in the hypothetical population of studies from which the set of studies are assumed to a random selection. Same estimate of the intercepet in REM.
-predict(meta1, digits=3, transf=transf.ztor)
+predict(meta2, digits=3, transf=transf.ztor)
 ```
 
-* estimate = 0.107, with 95% CI [0.087, 0.127] 
+* estimate = 0.107, with 95% CI [0.084, 0.130] 
 
-* The prediction interval ranges is $r = [-0.161, 0.359]$ . This means that it is possible that some future studies will find a negative correlation between mindset and academic achievement based on the present evidence. But the interval spans also over to a substantial positive effect. 
+* The prediction interval ranges is $r = [-0.212, 0.406]$ . This means that it is possible that some future studies will find a negative correlation between mindset and academic achievement based on the present evidence. But the interval spans also over to a substantial positive effect. 
+
+* I will continue the analyses using meta1
 
 \newpage
 
@@ -469,6 +481,91 @@ names(i2_comp) <- 'I^2'
 rownames(i2_comp) <- c('Common', 'Adolescents', 'Adults', 'Children')
 round(i2_comp,2)
 ```
+
+\newpage
+
+## Publication bias
+
+### Funnel plot 
+
+```{r}
+# Reference: https://wviechtb.github.io/metafor/reference/funnel.html 
+funnel(meta1, 
+       level=c(90, 95, 99), 
+       shade=c("white", "gray55", "gray75"), 
+       legend=TRUE)
+```
+
+### Egger's regression test
+
+```{r}
+# Reference: https://wviechtb.github.io/metafor/reference/regtest.html
+regtest(meta1, model = 'lm')
+```
+
+We cannot reject the null hypothesis that the intercept is equal to zero. Therefore we do not have evidence for funnel plot asymmetry. ("When there is no publication bias, the expected z score should be scattered around zero. No publication bias means means that the precision is not related to the effect size reported (beta1=0)).
+
+
+```{r}
+# Check with meta
+library(meta)
+meta_del <- metacor(cor = r, 
+                 n = n, 
+                 studlab = reference, 
+                 data= df2, 
+                 fixed = FALSE, 
+                 random = TRUE, 
+                 method.tau = 'REML', 
+                 hakn = FALSE, 
+                 title = "Mindset and Academic Achievement", 
+                 prediction = TRUE)
+metabias(meta_del, method.bias = 'linreg')
+```
+
+\newpage 
+
+### Trim and Fill method
+
+```{r}
+# Trim and Fill R0
+meta1_tf_R0 <- trimfill(meta1,
+                        estimator = 'R0')
+summary(meta1_tf_R0)
+funnel(meta1_tf_R0, legend=TRUE, cex=1.2)
+
+# Trim and Fill L0
+meta1_tf_L0 <- trimfill(meta1,
+                        estimator = 'L0')
+summary(meta1_tf_L0)
+funnel(meta1_tf_L0, legend=TRUE, cex=1.2)
+
+# Trim and Fill Q0
+meta1_tf_Q0 <- trimfill(meta1,
+                        estimator = 'Q0')
+summary(meta1_tf_Q0)
+funnel(meta1_tf_Q0, legend=TRUE, cex=1.2)
+```
+\newpage
+
+### Selection models 
+
+#### Three-parameter selection model
+
+```{r}
+meta1_3psm1 <- selmodel(meta1,
+                       type = 'stepfun', 
+                       steps = 0.025)
+summary(meta1_3psm1)
+```
+
+```{r}
+meta1_3psm2 <- selmodel(meta1,
+                       type = 'stepfun', 
+                       steps = 0.05)
+summary(meta1_3psm2)
+```
+
+
 \newpage
 
 ## Multilevel meta-analysis 
@@ -605,67 +702,93 @@ multilevel_i2(df3_develop$vi,
 
 ## Publication bias
 
-### Funnel plot 
+### Multilevel version of Egger's regression test
 
 ```{r}
-# Reference: https://wviechtb.github.io/metafor/reference/funnel.html 
-funnel(meta1, 
-       level=c(90, 95, 99), 
-       shade=c("white", "gray55", "gray75"), 
-       legend=TRUE)
+# Reference: Rodgers. RealData-Lehtonen-FinalTables.R Line 318
+rma.mv(yi ~ 1 + sqrt(vi), 
+       V = vi, 
+       random = ~ 1 | study_id/es_id, 
+       data = df3)
+
 ```
-
-### Egger's regression test
-
-```{r}
-# Reference: https://wviechtb.github.io/metafor/reference/regtest.html
-regtest(meta1, model = 'lm')
-```
-
-We cannot reject the null hypothesis that the intercept is equal to zero. Therefore we do not have evidence for funnel plot asymmetry. ("When there is no publication bias, the expected z score should be scattered around zero. No publication bias means means that the precision is not related to the effect size reported (beta1=0)).
-
-```{r}
-# Manually do calculations 
-df3 %>%
-  mutate(inv_se = 1/sqrt(vi)) %>%
-  lm(yi ~ inv_se, data =.) %>%
-  summary()
-```
-
-```{r}
-# Plot precision vs effect size
-df3 %>%
-  mutate(inv_se = 1/sqrt(vi)) %>%
-  ggplot(mapping = aes(x = inv_se, y =yi)) +
-  geom_point() +
-  geom_abline() +
-  theme_light()
-```
-
-```{r}
-# Check with meta
-library(meta)
-meta_del <- metacor(cor = r, 
-                 n = n, 
-                 studlab = reference, 
-                 data= df2, 
-                 fixed = FALSE, 
-                 random = TRUE, 
-                 method.tau = 'REML', 
-                 hakn = FALSE, 
-                 title = "Mindset and Academic Achievement", 
-                 prediction = TRUE)
-metabias(meta_del, method.bias = 'linreg')
-```
+\newpage 
 
 ### Trim and Fill method
 
+To perform the Trim and Fill, instead of ignoring dependence, like it was previously done, I can either sample one effect size per group or aggregate. 
+
+Here I create a new dataset where I aggregate the effect sizes 
+
 ```{r}
-# Reference: 
-meta1_tf <- trimfill(meta1)
-summary(meta1_tf)
-funnel(meta1_tf, legend=TRUE, cex=1.2)
+# Create dataset with aggregated effect sizes
+# My code
+# df4_aggregated<-
+#  df3 %>%
+#  group_by(study_id) %>%
+#  summarise(new_n = sum(n),
+#            sum_yi = sum(yi), 
+#            sum_vi = sum(vi),
+#            new_yi = (1/new_n)*sum_yi, 
+#            new_vi = (1/new_n)*sum_vi)
+
+# Reference: Rodgers RealData-Lehtonen-FinalTables.R, line 75
+# df4_comparison <-
+#  df3 %>%
+#  group_by(study_id) %>%
+#  summarise_at(vars(yi, vi), mean)
+
+# Fit a new model 
+# meta3_aggreagated <- rma (yi = new_yi,
+#                           vi = new_vi,
+#                           measure = 'ZCOR',
+#                           data = df4_aggregated,
+#                           method = 'REML')
+# summary(meta3_aggreagated, digits = 3)
+
+# Do trim and fill
 ```
+
+Here I create a new dataset where I sample the effect sizes 
+```{r}
+# Reference: Rodgers RealData-Lehtonen-FinalTables.R, line 86
+
+set.seed(1)
+
+df4_sampled <-
+  df3 %>%
+  group_by(study_id) %>%
+  sample_n(size = 1)
+
+# Fit RMA
+meta3_sampled<- rma (yi = yi,
+                     vi = vi,
+                     measure = 'ZCOR',
+                     data = df4_sampled,
+                     method = 'REML')
+summary(meta3_sampled, digits = 3)
+```
+
+```{r}
+# Trim and Fill R0
+meta3_sampled_tf_R0 <- trimfill(meta3_sampled,
+                                estimator = 'R0')
+summary(meta3_sampled_tf_R0 )
+funnel(meta3_sampled_tf_R0 , legend=TRUE, cex=1.2)
+
+# Trim and Fill L0
+meta3_sampled_tf_L0 <- trimfill(meta3_sampled,
+                                estimator = 'L0')
+summary(meta3_sampled_tf_L0)
+funnel(meta3_sampled_tf_L0, legend=TRUE, cex=1.2)
+
+# Trim and Fill Q0
+meta3_sampled_tf_Q0 <- trimfill(meta3_sampled,
+                                estimator = 'Q0')
+summary(meta3_sampled_tf_Q0)
+funnel(meta3_sampled_tf_Q0, legend=TRUE, cex=1.2)
+```
+
 \newpage
 
 ### Selection models 
@@ -673,15 +796,15 @@ funnel(meta1_tf, legend=TRUE, cex=1.2)
 #### Three-parameter selection model
 
 ```{r}
-meta1_3psm1 <- selmodel(meta1,
-                       type = 'stepfun', 
-                       steps = 0.025)
-summary(meta1_3psm1)
+meta3_sampled_3psm1 <- selmodel(meta3_sampled,
+                                type = 'stepfun',
+                                steps = 0.025)
+summary(meta3_sampled_3psm1)
 ```
 
 ```{r}
-meta1_3psm2 <- selmodel(meta1,
-                       type = 'stepfun', 
-                       steps = 0.05)
-summary(meta1_3psm2)
+meta3_sampled_3psm2 <- selmodel(meta3_sampled,
+                                type = 'stepfun',
+                                steps = 0.05)
+summary(meta3_sampled_3psm2)
 ```

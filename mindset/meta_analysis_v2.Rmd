@@ -2,9 +2,11 @@
 title: "Meta-analysis based on Sisks et al. (2018) - V.2"
 author: "Giulia Bertoldo"
 date: "4/10/2022"
-output: 
+output:
+  word_document:
+    toc: yes
   pdf_document:
-    toc: true 
+    toc: yes
 ---
 
 # Packages and Data
@@ -181,27 +183,106 @@ levels(df2$is_significant)
 df3 <- escalc(measure="ZCOR", ri=r, ni=n, data=df2)
 ```
 
+
+\newpage
+
+# Exploratory Data Analysis 
+
 ```{r}
+# How many effect sizes? 
+length(df3$study_id)
+
+# How many studies? 
+length(unique(df3$study_id))
+
+# How many samples?
+length(unique(df3$sample_id))
+
+```
+
+```{r}
+# How many effect sizes per study?
+df_groub_by_study <- df3 %>%
+  group_by(study_id) %>%
+  summarize(n_es = n()) 
+
+summarize(df_groub_by_study, 
+          min_n_es = min(n_es),
+          max_n_es = max(n_es), 
+          median_n_es = median(n_es))
+  
+ggplot(df_groub_by_study, aes(x=n_es)) +
+  geom_bar() +
+  labs(title = 'Number of effect sizes per study', 
+       x = 'Number of effect sizes',
+       y = 'Count of studies') +
+  scale_x_continuous(breaks = seq(0:27)) +
+  scale_y_continuous(breaks = seq(from = 0, to =80, by=5)) +
+  theme_light() 
+
+## Percentage of studies reporting 1 effect size 
+df_percentage_es <- df_groub_by_study %>%
+  group_by(n_es) %>%
+  summarize(total = n()) %>%
+  mutate(percentage = round(total/sum(total), 3))
+
+# Check that sums to 100
+sum(df_percentage_es$percentage)
+
+## Percentage of studies with more than 2 effect sizes 
+df_percentage_es %>%
+  filter(n_es > 2 ) %>%
+  mutate(sum = sum(percentage))
+```
+
+```{r}
+# Sample sizes 
+## Minimum sample size
+min(df3$n)
+## Maximum sample size
+max(df3$n)
+## Mean sample size
+mean(df3$n)
+## Median sample size
+median(df3$n)
+
+# Which study has the highest sample size?
+df3 %>%
+  filter(n == max(df3$n))
+# Claro et al. (2016)
+```
+
+```{r}
+# Open a png file 
+jpeg("distribution_z.jpeg", width = 800, height = 400, quality = 100)
 # Explore graphically Fisher's Z
-ggplot(df3, aes(x=yi)) +
+density_z <- ggplot(df3, aes(x=yi)) + 
   geom_histogram(aes(y=..density..), colour = 'black', fill = "white") +
-  geom_density(alpha=.2, fill="#FF6666") +
+  geom_density(alpha=.2, fill="#FF6666") + 
+  labs(x = "Fisher's Z score", 
+       y = "Density") +
   theme_classic()
 
 # Fisher's Z
 qqplot_z <- ggplot(df3, aes(sample=yi)) +
-  stat_qq() +
-  stat_qq_line() +
+  stat_qq(distribution = stats::qnorm) +
+  stat_qq_line(distribution = stats::qnorm,) +
+  labs(x = "Theoretical Quantiles", 
+       y = "Sample Quantiles") +
   theme_classic()
 
 # Original r 
-qqplot_r <- ggplot(df3, aes(sample=r))+
-  stat_qq() +
-  stat_qq_line() +
-  theme_classic()
+# qqplot_r <- ggplot(df3, aes(sample=r))+
+#   stat_qq() +
+#  stat_qq_line() +
+#  theme_classic()
 
-grid.arrange(qqplot_r, qqplot_z, ncol=2)
+grid.arrange(density_z, qqplot_z, ncol=2)
+
+# Close the png file
+dev.off()
 ```
+
 \newpage 
 
 # Meta-analysis 1: Random-effects model (REM)
@@ -211,13 +292,30 @@ Other notes: REML to estimate tau, no hakn correction.
 ```{r}
 # REM of the transformed correlations 
 meta1 <- rma (yi = yi, 
-                  vi = vi,
+                vi = vi,
                   measure = 'ZCOR',
                   data = df3, 
                   slab = es_id, 
                   method = 'REML')
 summary(meta1, digits = 3)
 ```
+
+\newpage
+
+## Pooled effect size 
+
+```{r}
+# Transform from z to r and see if the values you obtain make sense: 
+predict(meta1, digits=2, transf=transf.ztor)
+```
+* Number of studies = 273 
+
+* estimate = 0.11, with 95% CI [0.09, 0.13]. (This is Pearson Correlation)
+
+* The prediction interval ranges is $r = [-0.16, 0.36]$ . This means that it is possible that some future studies will find a negative correlation between mindset and academic achievement based on the present evidence. But the interval spans also over to a substantial positive effect. 
+
+* I will continue the analyses using meta1
+
 \newpage 
 
 # Meta-analysis 2: Random-effects model (REM) - For comparison with Sisks et al. 
@@ -235,22 +333,6 @@ meta2 <- rma (yi = yi,
 summary(meta1, digits = 3)
 ```
 
-## Pooled effect size 
-
-* Number of studies = 273 
-
-* estimate = 0.1071, with 95% CI [0.087, 0.127]. However, this Fisher's z, so, we need to transform it back to Pearson r for interpretation
-
-```{r}
-# Transform from z to r and see if the values you obtain make sense: 
-predict(meta2, digits=3, transf=transf.ztor)
-```
-
-* estimate = 0.107, with 95% CI [0.084, 0.130] 
-
-* The prediction interval ranges is $r = [-0.212, 0.406]$ . This means that it is possible that some future studies will find a negative correlation between mindset and academic achievement based on the present evidence. But the interval spans also over to a substantial positive effect. 
-
-* I will continue the analyses using meta1
 
 \newpage
 
@@ -306,6 +388,9 @@ Notes:
 ## Caterpillar plot 
 
 ```{r}
+# Open jpeg file
+jpeg("caterpillar.jpeg", quality = 100)
+
 # Source code:
 # http://www.metafor-project.org/doku.php/plots:caterpillar_plot 
 ### create plot
@@ -327,6 +412,15 @@ points(sort(df3$yi), length(df3$vi):1, pch=19, cex=0.5)
 ### add summary polygon at bottom and text
 addpoly(meta1, mlab="", cex=1, col = 'red')
 text(-2, -2, "RE Model", pos=4, offset=0, cex=1)
+
+# Close jpeg file
+dev.off()
+```
+
+```{r}
+# Find minimum and maximum value of point estimates 
+min(df2$r)
+max(df2$r)
 ```
 
 \newpage
@@ -500,7 +594,12 @@ funnel(meta1,
 
 ```{r}
 # Reference: https://wviechtb.github.io/metafor/reference/regtest.html
-regtest(meta1, model = 'lm')
+meta1_regtst <- regtest(meta1, model = 'lm')
+meta1_regtst
+
+meta1_regtst$model
+meta1_regtst$predictor
+meta1_regtst$fit
 ```
 
 We cannot reject the null hypothesis that the intercept is equal to zero. Therefore we do not have evidence for funnel plot asymmetry. ("When there is no publication bias, the expected z score should be scattered around zero. No publication bias means means that the precision is not related to the effect size reported (beta1=0)).
@@ -588,9 +687,9 @@ summary(meta1_multi1, digits =3)
 * Estimate: 0.0906. However, this is a Fisher's z, so we have to transform the effect back to a normal correlation: 
 
 ```{r}
-round(transf.ztor(meta1_multi1$b), 3)
-round(transf.ztor(meta1_multi1$ci.lb), 3)
-round(transf.ztor(meta1_multi1$ci.ub), 3)
+round(transf.ztor(meta1_multi1$b), 2)
+round(transf.ztor(meta1_multi1$ci.lb), 2)
+round(transf.ztor(meta1_multi1$ci.ub), 2)
 ```
 * The correlation is approximately 0.09 with 95%CI [0.065,0.116] 
 

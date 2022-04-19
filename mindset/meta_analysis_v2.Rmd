@@ -259,7 +259,7 @@ jpeg("distribution_z.jpeg", width = 800, height = 400, quality = 100)
 density_z <- ggplot(df3, aes(x=yi)) + 
   geom_histogram(aes(y=..density..), colour = 'black', fill = "white") +
   geom_density(alpha=.2, fill="#FF6666") + 
-  labs(x = "Fisher's Z score", 
+  labs(x = "Fisher's Z Transformed Correlation Coefficient", 
        y = "Density") +
   theme_classic()
 
@@ -299,6 +299,12 @@ meta1 <- rma (yi = yi,
                   method = 'REML')
 summary(meta1, digits = 3)
 ```
+
+```{r}
+# Confidence interval around tau^2
+confint.rma.uni(meta1, digits = 2)
+```
+
 
 \newpage
 
@@ -344,7 +350,7 @@ summary(meta1, digits = 3)
 # Obtain confidence interval for tau^2, I^2, H
 # Interval for tau^2 is obtained iteratively either via the Q-profile method or via the generalized Q-statistic method
 # The square root of the inter- val bounds is also returned for easier interpretation.
-# Confidence intervals for I2 and H2 are also provided (Higgins & Thompson, 2002). Since I2 and H2 are just monotonic transfor- mations of tau2 the confidence intervals for I2 and H2 are also exact
+# Confidence intervals for I2 and H2 are also provided (Higgins & Thompson, 2002). Since I2 and H2 are just monotonic transformations of tau2 the confidence intervals for I2 and H2 are also exact
 confint.rma.uni(meta1, digits = 3)
 
 ```
@@ -477,6 +483,8 @@ levels(df3_develop$development_stage)
 ```
 
 ```{r}
+# Open a jpeg file 
+jpeg("subgroup.jpeg", width = 800, height = 400, quality = 100)
 # Inspect visually the relationship between Fisher's z and the categories 
 # x = developmental_stage y = Fisher's z 
 ggplot(data=df3_develop, mapping = aes(x=development_stage, y = yi)) +
@@ -487,8 +495,11 @@ ggplot(data=df3_develop, mapping = aes(x=development_stage, y = yi)) +
                fill="#3399ff") +
   stat_summary(fun.y=mean, geom="point", shape=18,
                  size=3, color="#ff5050")+
+  labs(x = "Developmental Stage", 
+       y = "Fisher's Z Transformed Correlation Coefficient")
   theme_classic()
-
+# Close jpeg file
+dev.off()
 ```
 
 We see overlap in the outcome between the three categories, though it may be that children and adolescents show a higher effect than adults. 
@@ -500,6 +511,16 @@ Next, I a weighted ANOVA. There are two options:
 * common $\tau^2$: 
 
 * different $\tau^2$
+
+```{r}
+# How many studies and how many effect sizes?
+check <- df3 %>%
+  filter(development_stage == "Wide Range")
+# Number of studies
+length(unique(check$study_id))
+# Number of effect sizes
+length(unique(check$es_id))
+```
 
 
 ```{r}
@@ -514,7 +535,11 @@ meta1_develop1 <- rma (yi = yi,
 summary(meta1_develop1, digits = 3)
 
 # Transform the estimates of the differences from z to r 
-transf.ztor(meta1_develop1$b)
+estimate <- round(transf.ztor(meta1_develop1$b),2)
+cilb <- round(transf.ztor(meta1_develop1$ci.lb),2)
+ciup <- round(transf.ztor(meta1_develop1$ci.ub),2)
+
+(groups <- data.frame(cbind(estimate, cilb, ciup)))
 
 # Multiple comparisons
 # https://wviechtb.github.io/metafor/reference/rma.uni.html
@@ -540,7 +565,9 @@ meta1_develop2_ado <- rma (yi = yi,
                           mods = ~ development_stage-1,
                           subset = (development_stage=="Adolescents")) 
 summary(meta1_develop2_ado, digits = 3)
+```
 
+```{r}
 meta1_develop2_adu <- rma (yi = yi,
                            vi = vi,
                           measure = 'ZCOR',
@@ -548,7 +575,9 @@ meta1_develop2_adu <- rma (yi = yi,
                           mods = ~ development_stage-1,
                           subset = (development_stage=="Adults")) 
 summary(meta1_develop2_adu,  digits = 3)
+```
 
+```{r}
 meta1_develop2_chi <- rma (yi = yi,
                            vi = vi,
                           measure = 'ZCOR',
@@ -556,7 +585,9 @@ meta1_develop2_chi <- rma (yi = yi,
                           mods = ~ development_stage-1,
                           subset = (development_stage=="Children")) 
 summary(meta1_develop2_chi, digits =3)
+```
 
+```{r}
 # Compare tau^2 
 tau2_comp <- data.frame(rbind(meta1_develop1$tau2, 
                         meta1_develop2_ado$tau2,
@@ -695,6 +726,10 @@ round(transf.ztor(meta1_multi1$ci.ub), 2)
 
 * The test for heterogeneity rejects the null hypothesis of homogeneity, "however this is not informative. Instead, we should look at the amount of heterogeneity caputred by each level in our model." "We are interested in within-study variance (level 2) as well as between-study variance (level 3) and not the variance between all effect sizes in the dataset". 
 
+```{r}
+# Confidence intervals
+confint.rma.mv(meta1_multi1)
+```
 ### Testing the within-study variance
 
 ```{r}

@@ -27,41 +27,33 @@ df1 <- read_excel('data/mindset.xlsx', sheet = 'Meta-analysis 1')
 ```{r}
 # FUNCTION TO CALCULATE I^2 FOR EACH LEVEL IN A 3-LEVEL MODEL
 
-# Formulae 4.29 Chen 2015 + Paper
-# Higgins and Thompson (2002) preferred to define the typical within-study
-# sampling variance ... using the Q statistic:
+# Formulae:
+# Sampling variance: Chen(2015), formula (4.29), Higgins and Thompson statistics 
+# Multilevel I^2: Cheung(2014), formulae (10), (11) 
 
+# Function Inputs:
+# tau2_level2: multilevel within-study study variance
+# tau2_level3: multilevel between-study variance
+# vect_var: vector of variances (e.g. df$vi)
 
-# Inputs:
-# v: variance (e.g. df$vi)
-# k: number of studies (e.g. length(df$vi))
-# rma_obj: meta-analysis object (e.g. multilevel1)
-
-multilevel_i2 <- function(v, k, rma_obj)
-{
-  k <- length(v)
-  list.inverse.variances <- 1 /(v)
-  sum.inverse.variances <- sum(list.inverse.variances)
-  numerator <- (k - 1) * sum.inverse.variances
-
-  squared.sum.inverse.variances <- (sum.inverse.variances)^2
-
-  list.inverse.variances.square <- 1 / (v^2)
-  sum.inverse.variances.square <- sum(list.inverse.variances.square)
-  denominator <- squared.sum.inverse.variances - sum.inverse.variances.square
-
-  estimated.sampling.variance <- numerator / denominator
-
-  I2_1 <- (estimated.sampling.variance) / (rma_obj$sigma2[1] + rma_obj$sigma2[2] + estimated.sampling.variance)
-
-  I2_2 <- (rma_obj$sigma2[1]) / (rma_obj$sigma2[1] + rma_obj$sigma2[2] + estimated.sampling.variance)
-
-  I2_3 <- (rma_obj$sigma2[2]) / (rma_obj$sigma2[1] + rma_obj$sigma2[2] + estimated.sampling.variance)
-
-  I2_1 <- round((amountvariancelevel1 <- I2_1 * 100),2)
-  I2_2 <- round((amountvariancelevel2 <- I2_2 * 100),2)
-  I2_3 <- round((amountvariancelevel3 <- I2_3 * 100),2)
-
+multilevel_i2 <- function (tau2_level2, tau2_level3, vect_var) {
+  k <- length(vect_var)
+  numerator <- (k-1)*sum(1/vect_var)
+  denominator <- (sum(1/vect_var)^2) - sum(1/(vect_var)^2)
+  v <- numerator / denominator
+  
+  i2_denominator <- tau2_level2 + tau2_level3 + v
+  
+  i2_level1 <- v / i2_denominator
+    
+  i2_level2 <- tau2_level2 / i2_denominator
+  
+  i2_level3 <- tau2_level3 / i2_denominator
+  
+  I2_1 <- round((amountvariancelevel1 <- i2_level1 * 100),2)
+  I2_2 <- round((amountvariancelevel2 <- i2_level2 * 100),2)
+  I2_3 <- round((amountvariancelevel3 <- i2_level3 * 100),2)
+  
   col1 <- rbind(I2_1, I2_2, I2_3)
   col2 <- rbind('Level 1', 'Level 2', 'Level 3')
   I2_partition <- data.frame(col1, col2)
@@ -71,8 +63,9 @@ multilevel_i2 <- function(v, k, rma_obj)
   # Barplot
   ggplot(I2_partition, aes(x="", y=I2, fill=Level))+
     geom_bar(width = 1, stat = "identity") +
+    labs(title = "Distribution of variance across levels") +
     theme_light()
-
+  
 }
 ```
 
@@ -536,10 +529,11 @@ summary(meta1_develop1, digits = 3)
 
 # Transform the estimates of the differences from z to r 
 estimate <- round(transf.ztor(meta1_develop1$b),2)
+stand_er <- round(transf.ztor(meta1_develop1$se),2)
 cilb <- round(transf.ztor(meta1_develop1$ci.lb),2)
 ciup <- round(transf.ztor(meta1_develop1$ci.ub),2)
 
-(groups <- data.frame(cbind(estimate, cilb, ciup)))
+(groups <- data.frame(cbind(estimate, stand_er,cilb, ciup)))
 
 # Multiple comparisons
 # https://wviechtb.github.io/metafor/reference/rma.uni.html
@@ -549,6 +543,14 @@ multcomp_develop1 <- glht(meta1_develop1,
 
 summary(multcomp_develop1)
 # Note that the estimate of the differences in the output are Fisher z
+# So I need to transform them
+estimate <- round(transf.ztor(c(-0.13025, 0.05042, 0.18066)),2)
+stand_er <- round(transf.ztor(c(0.02061, 0.02798, 0.02840)),2)
+(groups <- data.frame(cbind(estimate, stand_er)))
+
+# Confidence intervals for tau^2
+confint.rma.uni(meta1_develop1, digits = 3)
+
 ```
 
 ```{r}
@@ -565,6 +567,7 @@ meta1_develop2_ado <- rma (yi = yi,
                           mods = ~ development_stage-1,
                           subset = (development_stage=="Adolescents")) 
 summary(meta1_develop2_ado, digits = 3)
+confint.rma.uni(meta1_develop2_ado, digits = 3)
 ```
 
 ```{r}
@@ -575,6 +578,7 @@ meta1_develop2_adu <- rma (yi = yi,
                           mods = ~ development_stage-1,
                           subset = (development_stage=="Adults")) 
 summary(meta1_develop2_adu,  digits = 3)
+confint.rma.uni(meta1_develop2_adu, digits = 3)
 ```
 
 ```{r}
@@ -585,6 +589,7 @@ meta1_develop2_chi <- rma (yi = yi,
                           mods = ~ development_stage-1,
                           subset = (development_stage=="Children")) 
 summary(meta1_develop2_chi, digits =3)
+confint.rma.uni(meta1_develop2_chi, digits = 3)
 ```
 
 ```{r}
@@ -765,7 +770,7 @@ meta1_multi3 <- rma.mv(yi = yi,
 
 # Perform a likelihood-ratio test to determine the significance of 
 # the within-study variance
-anova(meta1_multi1, meta1_multi3)
+anova(meta1_multi1, meta1_multi3, digits = 2)
 
 ```
 
@@ -778,19 +783,11 @@ anova(meta1_multi1, meta1_multi3)
 ```{r}
 # I^2 at different levels
 # See function description under 'Packages and data' at the top
-multilevel_i2(v = df3$vi, 
-              k = length(df3$vi),
-              rma_obj = meta1_multi1)
+multilevel_i2(tau2_level2 = meta1_multi1$sigma2[2],
+              tau2_level3 = meta1_multi1$sigma2[1],
+              vect_var = df3$vi)
 ```
-* Chen, 2015 pg. 92:  "I2 can be interpreted as the proportion of the total variation of the effect size that is due to the between-study heterogeneity"
 
-* 4.17 % of the total variance can be attributed to within-study sampling variance (level-1)
-
-* 75.43 % of the total variance can be attributed to within study variance  (differences between effect sizes within studies)
-
-* 20.4 % of the total variance can be attributed to differences between studies at level 3. 
-
-Conclusion: A lot of the variance is within-studies 
 
 ### Subgroup analysis 
 
@@ -809,6 +806,14 @@ meta1_multi1_develop1 <- rma.mv(yi = yi,
 # QUESTION: I don't have to specify  measure = 'ZCOR'?
 summary(meta1_multi1_develop1, digits =3)
 
+# Transform the estimates of the differences from z to r 
+estimate_m <- round(transf.ztor(meta1_multi1_develop1$b),2)
+se_m <- round(transf.ztor(meta1_multi1_develop1$se),2)
+cilb_m <- round(transf.ztor(meta1_multi1_develop1$ci.lb),2)
+ciup_m <- round(transf.ztor(meta1_multi1_develop1$ci.ub),2)
+
+(group_multi <- data.frame(cbind(estimate_m, se_m, cilb_m, ciup_m)))
+
 # Multiple comparisons
 multcomp_multi1_develop1 <- glht(meta1_multi1_develop1,
                                  linfct=contrMat(c("Adolescents"=1,"Adults"=1,"Children"=1),
@@ -816,6 +821,10 @@ multcomp_multi1_develop1 <- glht(meta1_multi1_develop1,
 
 summary(multcomp_multi1_develop1)
 # Note that the estimate of the differences in the output are Fisher z
+# So I need to transform them
+estimate <- round(transf.ztor(c(-0.14067, 0.04808, 0.18875)),2)
+stand_er <- round(transf.ztor(c(0.02523, 0.03825, 0.03913)),2)
+(groups <- data.frame(cbind(estimate, stand_er)))
 ```
 
 * Test for residual heterogeneity is significant: there is  significant unexplained variance left between all effect sizes in the data set after publication status has been added to the meta-analytic model 
@@ -828,9 +837,9 @@ Developmental stage is a moderator
 #####  Examine the residual within-study and between-study variance 
 
 ```{r}
-multilevel_i2(df3_develop$vi, 
-              k = length(df3_develop$vi),
-              rma_obj = meta1_multi1_develop1)
+multilevel_i2(tau2_level2 = meta1_multi1_develop1$sigma2[2],
+              tau2_level3 = meta1_multi1_develop1$sigma2[1],
+              vect_var = df3_develop$vi)
 
 ```
 

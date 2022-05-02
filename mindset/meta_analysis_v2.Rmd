@@ -304,7 +304,7 @@ confint.rma.uni(meta1, digits = 2)
 ## Pooled effect size 
 
 ```{r}
-# Transform from z to r and see if the values you obtain make sense: 
+# Transform from z to r 
 predict(meta1, digits=2, transf=transf.ztor)
 ```
 * Number of studies = 273 
@@ -616,7 +616,7 @@ round(i2_comp,2)
 
 ## Publication bias
 
-### Funnel plot 
+### Funnel plot overall  
 
 ```{r}
 # Reference: https://wviechtb.github.io/metafor/reference/funnel.html 
@@ -626,15 +626,15 @@ funnel(meta1,
        legend=TRUE)
 ```
 
-### Egger's regression test
+### Egger's regression test overall 
 
 ```{r}
 # Reference: https://wviechtb.github.io/metafor/reference/regtest.html
-meta1_regtst <- regtest(meta1, model = 'lm')
+meta1_regtst <- regtest(meta1, 
+                        model = 'lm',
+                        predictor = 'sei')
 meta1_regtst
 
-meta1_regtst$model
-meta1_regtst$predictor
 meta1_regtst$fit
 ```
 
@@ -656,6 +656,72 @@ meta_del <- metacor(cor = r,
                  prediction = TRUE)
 metabias(meta_del, method.bias = 'linreg')
 ```
+\newpage
+### Funnel plot Adolescents
+
+```{r}
+# Reference: https://wviechtb.github.io/metafor/reference/funnel.html 
+funnel(meta1_develop2_ado, 
+       level=c(90, 95, 99), 
+       shade=c("white", "gray55", "gray75"), 
+       legend=TRUE)
+```
+
+### Egger's regression test Adolescents
+
+```{r}
+# Reference: https://wviechtb.github.io/metafor/reference/regtest.html
+meta1_regtst_ado <- regtest(meta1_develop2_ado, 
+                        model = 'lm',
+                        predictor = 'sei')
+meta1_regtst_ado
+
+meta1_regtst_ado$fit
+```
+
+\newpage
+### Funnel plot Adults
+```{r}
+# Reference: https://wviechtb.github.io/metafor/reference/funnel.html 
+funnel(meta1_develop2_adu, 
+       level=c(90, 95, 99), 
+       shade=c("white", "gray55", "gray75"), 
+       legend=TRUE)
+```
+
+### Egger's regression test Adults
+```{r}
+# Reference: https://wviechtb.github.io/metafor/reference/regtest.html
+meta1_regtst_adu <- regtest(meta1_develop2_adu, 
+                        model = 'lm',
+                        predictor = 'sei')
+meta1_regtst_adu
+
+meta1_regtst_adu$fit
+```
+
+\newpage
+### Funnel plot Children
+```{r}
+# Reference: https://wviechtb.github.io/metafor/reference/funnel.html 
+funnel(meta1_develop2_chi, 
+       level=c(90, 95, 99), 
+       shade=c("white", "gray55", "gray75"), 
+       legend=TRUE)
+```
+
+### Egger's regression test Children
+
+```{r}
+# Reference: https://wviechtb.github.io/metafor/reference/regtest.html
+meta1_regtst_chi <- regtest(meta1_develop2_chi, 
+                        model = 'lm',
+                        predictor = 'sei')
+meta1_regtst_chi
+
+meta1_regtst_chi$fit
+```
+
 
 \newpage 
 
@@ -726,6 +792,10 @@ summary(meta1_multi1, digits =3)
 round(transf.ztor(meta1_multi1$b), 2)
 round(transf.ztor(meta1_multi1$ci.lb), 2)
 round(transf.ztor(meta1_multi1$ci.ub), 2)
+
+# Transform from z to r 
+predict(meta1_multi1, digits=2, transf=transf.ztor)
+
 ```
 * The correlation is approximately 0.09 with 95%CI [0.065,0.116] 
 
@@ -853,8 +923,9 @@ rma.mv(yi ~ 1 + sqrt(vi),
        V = vi, 
        random = ~ 1 | study_id/es_id, 
        data = df3)
-
 ```
+
+
 \newpage 
 
 ### Trim and Fill method

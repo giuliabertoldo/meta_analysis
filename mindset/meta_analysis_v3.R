@@ -447,13 +447,16 @@ funnel(meta1,
 # Reference: https://wviechtb.github.io/metafor/reference/regtest.html
 meta1_regtst <- regtest(meta1,
                         model = 'lm',
-                        predictor = 'sei')
+                        predictor = 'sei',
+                        ret.fit = TRUE)
 meta1_regtst
-
 meta1_regtst$fit
 
 # * Funnel plot adolescents -----------------------------------------------
- funnel(meta1_develop2_ado,
+# How many studies arethere in the adolescents group?
+meta1_develop2_ado$k
+
+funnel(meta1_develop2_ado,
        level=c(90, 95, 99),
        shade=c("white", "gray55", "gray75"),
        legend=TRUE)
@@ -461,12 +464,16 @@ meta1_regtst$fit
 # * Egger's regression test adolescents -----------------------------------
 meta1_regtst_ado <- regtest(meta1_develop2_ado,
                             model = 'lm',
-                            predictor = 'sei')
+                            predictor = 'sei',
+                            ret.fit = TRUE)
 meta1_regtst_ado
 
 meta1_regtst_ado$fit
 
 # * Funnel plot adults ----------------------------------------------------
+# How many studies arethere in the adults group?
+meta1_develop2_adu$k
+
 funnel(meta1_develop2_adu,
        level=c(90, 95, 99),
        shade=c("white", "gray55", "gray75"),
@@ -475,12 +482,16 @@ funnel(meta1_develop2_adu,
 # * Egger's regression test adults  ---------------------------------------
 meta1_regtst_adu <- regtest(meta1_develop2_adu,
                             model = 'lm',
-                            predictor = 'sei')
+                            predictor = 'sei',
+                            ret.fit = TRUE)
 meta1_regtst_adu
 
 meta1_regtst_adu$fit
 
 # * Funnel plot children --------------------------------------------------
+# How many studies are there in the children group?
+meta1_develop2_chi$k
+
 funnel(meta1_develop2_chi,
        level=c(90, 95, 99),
        shade=c("white", "gray55", "gray75"),
@@ -489,11 +500,11 @@ funnel(meta1_develop2_chi,
 # * Egger's regression test children --------------------------------------
 meta1_regtst_chi <- regtest(meta1_develop2_chi,
                             model = 'lm',
-                            predictor = 'sei')
+                            predictor = 'sei',
+                            ret.fit = TRUE)
 meta1_regtst_chi
 
 meta1_regtst_chi$fit
-
 
 # Three-level meta-analysis -----------------------------------------------
 meta1_multi1 <- rma.mv(yi = yi,

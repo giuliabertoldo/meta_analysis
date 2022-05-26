@@ -1,7 +1,6 @@
 
 # Load packages -----------------------------------------------------------
 library(tidyverse)
-library(meta)
 library(metafor)
 library(readxl)
 library(gridExtra) # for arranging qqplots
@@ -445,12 +444,29 @@ funnel(meta1,
 
 # * Egger's regression test overall ---------------------------------------
 # Reference: https://wviechtb.github.io/metafor/reference/regtest.html
+# model = lm
 meta1_regtst <- regtest(meta1,
                         model = 'lm',
                         predictor = 'sei',
                         ret.fit = TRUE)
 meta1_regtst
 meta1_regtst$fit
+
+# model = rma
+meta1_regtst_rma <- regtest(meta1,
+                        model = 'rma',
+                        predictor = 'sei',
+                        ret.fit = TRUE)
+meta1_regtst_rma
+meta1_regtst_rma$fit
+
+## The code below shows that the regtest with rma is equivalent to
+## a meta-regreeion with the standard error as predictor
+rma (yi = yi,
+     vi = vi,
+     measure = 'ZCOR',
+     data = df3,
+     mods = ~ sqrt(vi))
 
 # * Funnel plot adolescents -----------------------------------------------
 # How many studies arethere in the adolescents group?
@@ -462,13 +478,30 @@ funnel(meta1_develop2_ado,
        legend=TRUE)
 
 # * Egger's regression test adolescents -----------------------------------
+# lm
 meta1_regtst_ado <- regtest(meta1_develop2_ado,
                             model = 'lm',
                             predictor = 'sei',
                             ret.fit = TRUE)
 meta1_regtst_ado
+#meta1_regtst_ado$fit
 
-meta1_regtst_ado$fit
+# rma
+meta1_regtst_ado_rma <- regtest(meta1_develop2_ado,
+                            model = 'rma',
+                            predictor = 'sei',
+                            ret.fit = TRUE)
+meta1_regtst_ado_rma
+meta1_regtst_ado_rma$fit
+
+## The code below shows that the regtest with rma is equivalent to
+## a meta-regreeion with the standard error as predictor
+rma (yi = yi,
+     vi = vi,
+     measure = 'ZCOR',
+     data = df3_develop,
+     subset = (development_stage=="Adolescents"),
+     mods = ~ sqrt(vi))
 
 # * Funnel plot adults ----------------------------------------------------
 # How many studies arethere in the adults group?
@@ -480,13 +513,29 @@ funnel(meta1_develop2_adu,
        legend=TRUE)
 
 # * Egger's regression test adults  ---------------------------------------
+# lm
 meta1_regtst_adu <- regtest(meta1_develop2_adu,
                             model = 'lm',
                             predictor = 'sei',
                             ret.fit = TRUE)
 meta1_regtst_adu
-
 meta1_regtst_adu$fit
+
+# rma
+meta1_regtst_adu_rma <- regtest(meta1_develop2_adu,
+                            model = 'rma',
+                            predictor = 'sei',
+                            ret.fit = TRUE)
+meta1_regtst_adu_rma
+
+## The code below shows that the regtest with rma is equivalent to
+## a meta-regression with the standard error as predictor
+rma (yi = yi,
+     vi = vi,
+     measure = 'ZCOR',
+     data = df3_develop,
+     subset = (development_stage=="Adults"),
+     mods = ~ sqrt(vi))
 
 # * Funnel plot children --------------------------------------------------
 # How many studies are there in the children group?
@@ -498,13 +547,28 @@ funnel(meta1_develop2_chi,
        legend=TRUE)
 
 # * Egger's regression test children --------------------------------------
+# lm
 meta1_regtst_chi <- regtest(meta1_develop2_chi,
                             model = 'lm',
                             predictor = 'sei',
                             ret.fit = TRUE)
 meta1_regtst_chi
 
-meta1_regtst_chi$fit
+# rma
+meta1_regtst_chi_rma <- regtest(meta1_develop2_chi,
+                            model = 'rma',
+                            predictor = 'sei',
+                            ret.fit = TRUE)
+meta1_regtst_chi_rma
+
+## The code below shows that the regtest with rma is equivalent to
+## a meta-regression with the standard error as predictor
+rma (yi = yi,
+     vi = vi,
+     measure = 'ZCOR',
+     data = df3_develop,
+     subset = (development_stage=="Children"),
+     mods = ~ sqrt(vi))
 
 # Three-level meta-analysis -----------------------------------------------
 meta1_multi1 <- rma.mv(yi = yi,
@@ -556,7 +620,6 @@ multcomp_multi1_develop1 <- glht(meta1_multi1_develop1,
 
 summary(multcomp_multi1_develop1)
 # Note that the estimate of the differences in the output are Fisher z
-
 # So I need to transform them
 estimate <- round(transf.ztor(c(-0.14067, 0.04808, 0.18875)),2)
 stand_er <- round(transf.ztor(c(0.02523, 0.03825, 0.03913)),2)
@@ -564,6 +627,32 @@ stand_er <- round(transf.ztor(c(0.02523, 0.03825, 0.03913)),2)
 
 
 
+# ** Egger's regression test: multilevel ----------------------------------
 
+# Adolescents
+rma.mv(yi = yi,
+       V = vi,
+       random = list(~1 | study_id/es_id),
+       data = df3_develop,
+       slab = es_id,
+       subset = (development_stage=="Adolescents"),
+       mods = ~ sqrt(vi))
 
+# Adults
+rma.mv(yi = yi,
+       V = vi,
+       random = list(~1 | study_id/es_id),
+       data = df3_develop,
+       slab = es_id,
+       subset = (development_stage=="Adults"),
+       mods = sqrt(vi))
+
+# Children
+rma.mv(yi = yi,
+       V = vi,
+       random = list(~1 | study_id/es_id),
+       data = df3_develop,
+       slab = es_id,
+       subset = (development_stage=="Children"),
+       mods = sqrt(vi))
 
